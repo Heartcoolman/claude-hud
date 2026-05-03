@@ -69,6 +69,90 @@ winget install OpenJS.NodeJS.LTS
 
 ---
 
+## ReClaude 拼车配额接入（fork 专属、仅 macOS）
+
+本 fork 在 `Context | Usage` 之下额外渲染一行 **`ReClaude`**，显示
+[reclaude.ai](https://reclaude.ai) 拼车 5 小时配额——**金额进度条** + **时间进度条**——
+直接从 reclaude 的计费接口拉取。
+
+### 安装
+
+```
+/claude-hud:reclaude-setup
+```
+
+向导会引导你：
+
+1. 输入你的 reclaude.ai 邮箱
+2. 在终端里跑一行小脚本，把密码存入 **macOS Keychain**
+   （**密码全程不经过 Claude Code 本身**）
+3. 自动把 `display.reclaude` 块合并进 `~/.claude/plugins/claude-hud/config.json`，
+   保留你已有的所有其他配置项不变
+4. 立即触发首次 fetch，并显示成功 / 失败的可见反馈
+
+完成后状态栏形如：
+
+```
+[Opus] │ my-project git:(main*)
+Context ███░░░░░░░ 29% │ Usage ███░░░░░░░ 26% (38m / 5h)
+ReClaude $ █████░░░░░ 47% ($23.69/$50) | ⏱ ██░░░░░░░░ 21% (3h 57m / 5h)
+```
+
+### 自动刷新原理
+
+每 60 秒 fetcher 优先用缓存里的 cookie 拉一次。一旦 reclaude 返回 401：
+
+1. 自动 POST `{email, password}`（密码通过 `security` CLI 从 Keychain 取出）到 `/api/auth/login`
+2. 抓取返回的 `Set-Cookie: rc_sid=...` 写回你的 config（**原子写入**、保留其它字段）
+3. 用新 cookie 重发请求、缓存数据
+4. 下一次状态栏 tick 即显示新数据
+
+整套流程**无需任何浏览器交互**。同时为防止持续错误密码下打爆登录接口，连续 401
+触发 **5 分钟冷却**。
+
+### 手动 cookie 路径（Linux / Windows）
+
+自动刷新依赖 macOS Keychain，所以仅 macOS 可用。其它平台仍可手动贴 cookie 渲染：
+
+1. 浏览器访问 `https://reclaude.ai/app`，确认已登录
+2. DevTools → **Application** → **Cookies** → `reclaude.ai` → 复制 `rc_sid` 值
+3. 编辑 `~/.claude/plugins/claude-hud/config.json`：
+   ```json
+   {
+     "display": {
+       "reclaude": {
+         "enabled": true,
+         "cookie": "rc_sid=粘贴你的值"
+       }
+     }
+   }
+   ```
+4. 过期后再来一次（一般几天有效，但你在别处登录会让旧 session 立即失效）
+
+### 关闭
+
+```bash
+# 1. 编辑 config.json 删掉 "reclaude" 块：
+$EDITOR ~/.claude/plugins/claude-hud/config.json
+
+# 2. 从 Keychain 移除密码（macOS）：
+security delete-generic-password -a 你的邮箱 -s claude-hud-reclaude
+
+# 3. 清理缓存与 sentinel：
+rm -rf ~/.cache/claude-hud
+```
+
+### 安全说明
+
+- `email` 以明文存于 `config.json`（默认 `chmod 600`）
+- `password` **永远不被 claude-hud 写入磁盘**；仅 Keychain 持有，fetcher 在每次需要时
+  通过 `security find-generic-password` 临时读取
+- `rc_sid` cookie 短时间内有效、自动轮转；视为密码处理（`config.json` 已 `chmod 600`）
+- fetcher 仅访问两个接口：`GET /api/app/billing/carpool-quota` 与
+  `POST /api/auth/login`，**不会传输任何对话数据**
+
+---
+
 ## 什么是 Claude HUD？
 
 Claude HUD 让你在 Claude Code 会话中获得更清晰的洞察。
@@ -86,10 +170,12 @@ Claude HUD 让你在 Claude Code 会话中获得更清晰的洞察。
 ### 默认（2 行）
 ```
 [Opus] │ my-project git:(main*)
-上下文 █████░░░░░ 45% │ 使用率 ██░░░░░░░░ 25%（1小时30分 / 5小时）
+上下文 █████░░░░░ 45% │ 用量 ██░░░░░░░░ 25% (1h 30m / 5h)
 ```
 - **第 1 行** — 模型、提供商标签（如能正面识别，例如 `Bedrock`、`Vertex`）、项目路径、git 分支
 - **第 2 行** — 上下文进度条（绿 → 黄 → 红）和使用率限制
+  - 紧凑括号格式 `(38m / 5h)`，5 小时窗口剩余时长 + window 标签
+  - 7 天窗口在 `sevenDayThreshold` 触发时附加：`| ███░░ 23% (2d 5h / 7d)`
 
 ### 可选行（通过 `/claude-hud:configure` 启用）
 ```

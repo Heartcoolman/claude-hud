@@ -4,6 +4,40 @@ All notable changes to Claude HUD will be documented in this file.
 
 ## [Unreleased]
 
+### Added (Heartcoolman fork)
+- **ReClaude carpool quota integration** — separate `ReClaude` statusline element
+  rendering the [reclaude.ai](https://reclaude.ai) carpool 5h cap as two
+  progress bars: USD spend (`$ used/$ quota`) and time-elapsed in the rolling
+  5h window (`⏱ Xh Ym / 5h`). New `proxy` HudElement, by default rendered on
+  its own line below `Context | Usage`.
+- Multi-tier cookie auto-refresh on 401 (macOS only):
+  1. Cached cookie from config
+  2. Chrome cookie store decrypt (`v10`/`v11`, PBKDF2 + AES-128-CBC, strips
+     32-byte SHA-256 prefix introduced in Chrome 130+)
+  3. POST credentials to `/api/auth/login`, password retrieved from macOS
+     Keychain via `security` CLI (5-min cooldown on persistent 401)
+  4. `*.error` sentinel file → renderer shows `ReClaude ⚠ login required`
+- Atomic config rotation: new `rc_sid` is written back to user config.json
+  preserving every other field.
+- `/claude-hud:reclaude-setup` interactive slash command guiding email entry,
+  Keychain password storage, config merge, and first-fetch verification.
+- `scripts/set-reclaude-password.sh` helper that wraps
+  `security add-generic-password` with the right service name.
+- New i18n entry `status.loginRequired` (en: "login required", zh: "需重新登录").
+
+### Changed (Heartcoolman fork)
+- Bar-mode usage line uses tighter `(38m / 5h)` format instead of
+  `(resets in 38m)`, matching session-line compact mode. Outer `Weekly`
+  label hidden in normal width, restored when narrow-terminal stacking
+  forces alignment.
+- 7d window now shows `7d` inside the parens (e.g. `(2d 5h / 7d)`) while
+  preserving the `Weekly` translation in text-only and stacked modes.
+- Default `cacheTTLMs` raised from 30 s → 60 s (one fetch per minute) and
+  `maxStaleMs` raised from 5 min → 10 min.
+- `proxy-usage.ts::resolveFetcherPath` now picks `.ts` vs `.js` based on the
+  current module extension, so the fetcher works under both `bun src/` and
+  `node dist/`.
+
 ## [0.0.12] - 2026-04-04
 
 ### Added
