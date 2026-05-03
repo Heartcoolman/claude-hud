@@ -240,6 +240,35 @@ export function renderSessionLine(ctx) {
             }
         }
     }
+    // Proxy (reclaude.ai carpool) 5h usage — independent of Anthropic rate_limits.
+    // Always rendered when present and not Bedrock; ignores usageThreshold since
+    // it carries an independent USD cap that the user opted into via config.
+    if (display?.showUsage !== false && !shouldHideUsage(ctx.stdin)) {
+        const usageCompact = display?.usageCompact ?? false;
+        const usageBarEnabled = display?.usageBarEnabled ?? true;
+        const showResetLabel = display?.showResetLabel ?? true;
+        if (ctx.proxyUsage) {
+            if (usageCompact) {
+                parts.push(formatCompactProxyPart(ctx.proxyUsage, timeFormat, colors));
+            }
+            else {
+                parts.push(formatProxyWindowPart({
+                    proxyUsage: ctx.proxyUsage,
+                    colors,
+                    usageBarEnabled,
+                    barWidth,
+                    timeFormat,
+                    showResetLabel,
+                }));
+            }
+        }
+        else if (ctx.proxyAuthStatus === 'login_required') {
+            const proxyLabel = usageCompact
+                ? label('proxy:', colors)
+                : label(t('label.proxy'), colors);
+            parts.push(`${proxyLabel} ${critical(`⚠ ${t('status.loginRequired')}`, colors)}`);
+        }
+    }
     // Session token usage (cumulative)
     if (display?.showSessionTokens && ctx.transcript.sessionTokens) {
         const st = ctx.transcript.sessionTokens;
@@ -354,5 +383,52 @@ function formatUsageWindowPart({ label: windowLabel, percent, resetAt, colors, u
     return resetSuffix
         ? `${styledLabel} ${usageDisplay} ${resetSuffix}`
         : `${styledLabel} ${usageDisplay}`;
+}
+// ─── Proxy formatting (mirror of lines/usage.ts; compact-mode rendering) ───
+function formatProxyMoney(used, quota) {
+    const usedStr = used.toFixed(2);
+    const quotaStr = Number.isInteger(quota) ? quota.toFixed(0) : quota.toFixed(2);
+    return `$${usedStr}/$${quotaStr}`;
+}
+function formatProxyWindowPart({ proxyUsage, colors, usageBarEnabled, barWidth, timeFormat, showResetLabel, }) {
+    const styledLabel = label(t('label.proxy'), colors);
+    const usageDisplay = formatUsagePercent(proxyUsage.percent, colors);
+    const reset = formatResetTime(proxyUsage.resetAt, timeFormat);
+    const resetsKey = timeFormat === 'absolute' ? 'format.resets' : 'format.resetsIn';
+    const money = formatProxyMoney(proxyUsage.usedUsd, proxyUsage.quotaUsd);
+    if (usageBarEnabled) {
+        const insideParens = [money];
+        if (reset) {
+            if (timeFormat === 'relative') {
+                insideParens.push(`${reset}/5h`);
+            }
+            else if (showResetLabel) {
+                insideParens.push(`${t(resetsKey)} ${reset}`);
+            }
+            else {
+                insideParens.push(reset);
+            }
+        }
+        const suffix = label(`(${insideParens.join(' ')})`, colors);
+        return `${styledLabel} ${quotaBar(proxyUsage.percent, barWidth, colors)} ${usageDisplay} ${suffix}`;
+    }
+    const styledMoney = label(money, colors);
+    const resetSuffix = reset
+        ? showResetLabel
+            ? `(${t(resetsKey)} ${reset})`
+            : `(${reset})`
+        : '';
+    return resetSuffix
+        ? `${styledLabel} ${usageDisplay} ${styledMoney} ${resetSuffix}`
+        : `${styledLabel} ${usageDisplay} ${styledMoney}`;
+}
+function formatCompactProxyPart(proxyUsage, timeFormat, colors) {
+    const usageDisplay = formatUsagePercent(proxyUsage.percent, colors);
+    const reset = formatResetTime(proxyUsage.resetAt, timeFormat);
+    const styledLabel = label('proxy:', colors);
+    const styledMoney = label(formatProxyMoney(proxyUsage.usedUsd, proxyUsage.quotaUsd), colors);
+    return reset
+        ? `${styledLabel} ${usageDisplay} ${styledMoney} ${label(`(${reset})`, colors)}`
+        : `${styledLabel} ${usageDisplay} ${styledMoney}`;
 }
 //# sourceMappingURL=session-line.js.map

@@ -1,4 +1,4 @@
-import type { RenderContext } from '../types.js';
+import type { RenderContext, ProxyUsageData } from '../types.js';
 import { isLimitReached } from '../types.js';
 import { getContextPercent, getBufferedPercent, getModelName, formatModelName, getProviderLabel, getTotalTokens, shouldHideUsage } from '../stdin.js';
 import { getOutputSpeed } from '../speed-tracker.js';
@@ -253,6 +253,35 @@ export function renderSessionLine(ctx: RenderContext): string {
     }
   }
 
+  // Proxy (reclaude.ai carpool) 5h usage — independent of Anthropic rate_limits.
+  // Always rendered when present and not Bedrock; ignores usageThreshold since
+  // it carries an independent USD cap that the user opted into via config.
+  if (display?.showUsage !== false && !shouldHideUsage(ctx.stdin)) {
+    const usageCompact = display?.usageCompact ?? false;
+    const usageBarEnabled = display?.usageBarEnabled ?? true;
+    const showResetLabel = display?.showResetLabel ?? true;
+
+    if (ctx.proxyUsage) {
+      if (usageCompact) {
+        parts.push(formatCompactProxyPart(ctx.proxyUsage, timeFormat, colors));
+      } else {
+        parts.push(formatProxyWindowPart({
+          proxyUsage: ctx.proxyUsage,
+          colors,
+          usageBarEnabled,
+          barWidth,
+          timeFormat,
+          showResetLabel,
+        }));
+      }
+    } else if (ctx.proxyAuthStatus === 'login_required') {
+      const proxyLabel = usageCompact
+        ? label('proxy:', colors)
+        : label(t('label.proxy'), colors);
+      parts.push(`${proxyLabel} ${critical(`⚠ ${t('status.loginRequired')}`, colors)}`);
+    }
+  }
+
   // Session token usage (cumulative)
   if (display?.showSessionTokens && ctx.transcript.sessionTokens) {
     const st = ctx.transcript.sessionTokens;
@@ -414,4 +443,73 @@ function formatUsageWindowPart({
   return resetSuffix
     ? `${styledLabel} ${usageDisplay} ${resetSuffix}`
     : `${styledLabel} ${usageDisplay}`;
+}
+
+// ─── Proxy formatting (mirror of lines/usage.ts; compact-mode rendering) ───
+
+function formatProxyMoney(used: number, quota: number): string {
+  const usedStr = used.toFixed(2);
+  const quotaStr = Number.isInteger(quota) ? quota.toFixed(0) : quota.toFixed(2);
+  return `$${usedStr}/$${quotaStr}`;
+}
+
+function formatProxyWindowPart({
+  proxyUsage,
+  colors,
+  usageBarEnabled,
+  barWidth,
+  timeFormat,
+  showResetLabel,
+}: {
+  proxyUsage: ProxyUsageData;
+  colors?: RenderContext['config']['colors'];
+  usageBarEnabled: boolean;
+  barWidth: number;
+  timeFormat: TimeFormatMode;
+  showResetLabel: boolean;
+}): string {
+  const styledLabel = label(t('label.proxy'), colors);
+  const usageDisplay = formatUsagePercent(proxyUsage.percent, colors);
+  const reset = formatResetTime(proxyUsage.resetAt, timeFormat);
+  const resetsKey = timeFormat === 'absolute' ? 'format.resets' : 'format.resetsIn';
+  const money = formatProxyMoney(proxyUsage.usedUsd, proxyUsage.quotaUsd);
+
+  if (usageBarEnabled) {
+    const insideParens: string[] = [money];
+    if (reset) {
+      if (timeFormat === 'relative') {
+        insideParens.push(`${reset}/5h`);
+      } else if (showResetLabel) {
+        insideParens.push(`${t(resetsKey)} ${reset}`);
+      } else {
+        insideParens.push(reset);
+      }
+    }
+    const suffix = label(`(${insideParens.join(' ')})`, colors);
+    return `${styledLabel} ${quotaBar(proxyUsage.percent, barWidth, colors)} ${usageDisplay} ${suffix}`;
+  }
+
+  const styledMoney = label(money, colors);
+  const resetSuffix = reset
+    ? showResetLabel
+      ? `(${t(resetsKey)} ${reset})`
+      : `(${reset})`
+    : '';
+  return resetSuffix
+    ? `${styledLabel} ${usageDisplay} ${styledMoney} ${resetSuffix}`
+    : `${styledLabel} ${usageDisplay} ${styledMoney}`;
+}
+
+function formatCompactProxyPart(
+  proxyUsage: ProxyUsageData,
+  timeFormat: TimeFormatMode,
+  colors?: RenderContext['config']['colors'],
+): string {
+  const usageDisplay = formatUsagePercent(proxyUsage.percent, colors);
+  const reset = formatResetTime(proxyUsage.resetAt, timeFormat);
+  const styledLabel = label('proxy:', colors);
+  const styledMoney = label(formatProxyMoney(proxyUsage.usedUsd, proxyUsage.quotaUsd), colors);
+  return reset
+    ? `${styledLabel} ${usageDisplay} ${styledMoney} ${label(`(${reset})`, colors)}`
+    : `${styledLabel} ${usageDisplay} ${styledMoney}`;
 }

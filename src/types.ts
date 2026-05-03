@@ -95,6 +95,26 @@ export interface ExternalUsageSnapshot {
   updated_at?: string | number | null;
 }
 
+/**
+ * Carpool / proxy provider 5-hour usage (e.g. reclaude.ai).
+ *
+ * This sits alongside Anthropic's native `rate_limits` (UsageData) — the
+ * proxy account has its own 5h cap measured in USD, independent of the
+ * upstream Anthropic 5h percentage exposed via stdin.
+ */
+export interface ProxyUsageData {
+  /** USD already spent in current 5h window. */
+  usedUsd: number;
+  /** USD cap for current 5h window. */
+  quotaUsd: number;
+  /** 0-100, derived from used / quota and clamped. */
+  percent: number;
+  /** When the 5h window resets. null when the upstream omits it. */
+  resetAt: Date | null;
+  /** When the snapshot was fetched (UNIX ms). Used for staleness checks. */
+  fetchedAt: number;
+}
+
 export interface MemoryInfo {
   totalBytes: number;
   usedBytes: number;
@@ -136,6 +156,8 @@ export interface RenderContext {
   sessionDuration: string;
   gitStatus: GitStatus | null;
   usageData: UsageData | null;
+  proxyUsage: ProxyUsageData | null;
+  proxyAuthStatus: 'login_required' | null;
   memoryUsage: MemoryInfo | null;
   config: HudConfig;
   extraLabel: string | null;

@@ -9,11 +9,15 @@ import { getClaudeCodeVersion } from "./version.js";
 import { getMemoryUsage } from "./memory.js";
 import { applyContextWindowFallback } from "./context-cache.js";
 import { getUsageFromExternalSnapshot } from "./external-usage.js";
+import { getProxyUsage, getProxyAuthStatus } from "./proxy-usage.js";
 export { getUsageFromExternalSnapshot } from "./external-usage.js";
+export { getProxyUsage, getProxyAuthStatus } from "./proxy-usage.js";
 export type MainDeps = {
     readStdin: typeof readStdin;
     getUsageFromStdin: typeof getUsageFromStdin;
     getUsageFromExternalSnapshot: typeof getUsageFromExternalSnapshot;
+    getProxyUsage: typeof getProxyUsage;
+    getProxyAuthStatus: typeof getProxyAuthStatus;
     parseTranscript: typeof parseTranscript;
     countConfigs: typeof countConfigs;
     getGitStatus: typeof getGitStatus;

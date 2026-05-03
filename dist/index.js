@@ -10,8 +10,10 @@ import { getMemoryUsage } from "./memory.js";
 import { resolveEffortLevel } from "./effort.js";
 import { applyContextWindowFallback } from "./context-cache.js";
 import { getUsageFromExternalSnapshot } from "./external-usage.js";
+import { getProxyUsage, getProxyAuthStatus } from "./proxy-usage.js";
 import { setLanguage, t } from "./i18n/index.js";
 export { getUsageFromExternalSnapshot } from "./external-usage.js";
+export { getProxyUsage, getProxyAuthStatus } from "./proxy-usage.js";
 import { fileURLToPath } from "node:url";
 import { realpathSync } from "node:fs";
 export async function main(overrides = {}) {
@@ -19,6 +21,8 @@ export async function main(overrides = {}) {
         readStdin,
         getUsageFromStdin,
         getUsageFromExternalSnapshot,
+        getProxyUsage,
+        getProxyAuthStatus,
         parseTranscript,
         countConfigs,
         getGitStatus,
@@ -65,6 +69,12 @@ export async function main(overrides = {}) {
                 usageData = deps.getUsageFromExternalSnapshot(config, deps.now());
             }
         }
+        const proxyUsage = config.display.showUsage !== false
+            ? deps.getProxyUsage(config, deps.now())
+            : null;
+        const proxyAuthStatus = config.display.showUsage !== false
+            ? deps.getProxyAuthStatus(config, deps.now())
+            : null;
         const extraCmd = deps.parseExtraCmdArg();
         const extraLabel = extraCmd ? await deps.runExtraCmd(extraCmd) : null;
         const sessionDuration = formatSessionDuration(transcript.sessionStart, deps.now);
@@ -87,6 +97,8 @@ export async function main(overrides = {}) {
             sessionDuration,
             gitStatus,
             usageData,
+            proxyUsage,
+            proxyAuthStatus,
             memoryUsage,
             config,
             extraLabel,

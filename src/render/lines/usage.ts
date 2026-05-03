@@ -110,6 +110,7 @@ export function renderUsageLine(
     const sevenDayPart = formatUsageWindowPart({
       label: t("label.weekly"),
       labelKey: "label.weekly",
+      windowSuffix: "7d",
       percent: sevenDay,
       resetAt: ctx.usageData.sevenDayResetAt,
       colors,
@@ -117,7 +118,6 @@ export function renderUsageLine(
       barWidth,
       timeFormat,
       showResetLabel,
-      forceLabel: true,
       alignLabels,
     });
     return `${usageLabel} ${fiveHourPart} | ${sevenDayPart}`;
@@ -155,6 +155,7 @@ function formatUsagePercent(
 function formatUsageWindowPart({
   label: windowLabel,
   labelKey,
+  windowSuffix,
   percent,
   resetAt,
   colors,
@@ -167,6 +168,8 @@ function formatUsageWindowPart({
 }: {
   label: string;
   labelKey?: MessageKey;
+  /** Override what appears after `${reset} /` inside the parens (defaults to `label`). */
+  windowSuffix?: string;
   percent: number | null;
   resetAt: Date | null;
   colors?: RenderContext["config"]["colors"];
@@ -183,20 +186,28 @@ function formatUsageWindowPart({
     ? progressLabel(labelKey, colors, alignLabels)
     : label(windowLabel, colors);
   const resetsKey = timeFormat === 'absolute' ? "format.resets" : "format.resetsIn";
+  const suffixText = windowSuffix ?? windowLabel;
+
+  if (usageBarEnabled) {
+    // Relative mode keeps the upstream "(duration / windowLabel)" pattern
+    // (e.g. "(38m / 5h)"). Absolute/both modes use the preposition form
+    // ("(at 14:30)") since "(at 14:30 / 5h)" is incoherent.
+    const barReset = timeFormat === 'relative'
+      ? (reset ? `${reset} / ${suffixText}` : null)
+      : (reset ? (showResetLabel ? `${t(resetsKey)} ${reset}` : reset) : null);
+    const body = barReset
+      ? `${quotaBar(percent ?? 0, barWidth, colors)} ${usageDisplay} (${barReset})`
+      : `${quotaBar(percent ?? 0, barWidth, colors)} ${usageDisplay}`;
+    // Outer label only when explicitly forced or when stacked (alignLabels) so
+    // the merged-line wrapping still renders "Weekly" / "本周" prefix.
+    return (forceLabel || alignLabels) ? `${styledLabel} ${body}` : body;
+  }
 
   const resetSuffix = reset
     ? showResetLabel
       ? `(${t(resetsKey)} ${reset})`
       : `(${reset})`
     : "";
-
-  if (usageBarEnabled) {
-    const body = resetSuffix
-      ? `${quotaBar(percent ?? 0, barWidth, colors)} ${usageDisplay} ${resetSuffix}`
-      : `${quotaBar(percent ?? 0, barWidth, colors)} ${usageDisplay}`;
-    return forceLabel ? `${styledLabel} ${body}` : body;
-  }
-
   return resetSuffix
     ? `${styledLabel} ${usageDisplay} ${resetSuffix}`
     : `${styledLabel} ${usageDisplay}`;

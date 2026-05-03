@@ -3,6 +3,7 @@ export type MessageKey =
   | "label.context"
   | "label.usage"
   | "label.weekly"
+  | "label.proxy"
   | "label.approxRam"
   | "label.promptCache"
   | "label.rules"
@@ -14,6 +15,7 @@ export type MessageKey =
   | "status.limitReached"
   | "status.allTodosComplete"
   | "status.expired"
+  | "status.loginRequired"
   // Format
   | "format.resets"
   | "format.resetsIn"

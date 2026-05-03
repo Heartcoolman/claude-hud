@@ -7,6 +7,7 @@ export const DEFAULT_ELEMENT_ORDER = [
     'addedDirs',
     'context',
     'usage',
+    'proxy',
     'promptCache',
     'memory',
     'environment',
@@ -75,6 +76,18 @@ export const DEFAULT_CONFIG = {
         modelOverride: '',
         customLine: '',
         timeFormat: 'relative',
+        reclaude: {
+            enabled: false,
+            cookie: '',
+            apiUrl: 'https://reclaude.ai/api/app/billing/carpool-quota',
+            cachePath: '~/.cache/claude-hud/reclaude-quota.json',
+            cacheTTLMs: 60000,
+            maxStaleMs: 600000,
+            fetchTimeoutMs: 5000,
+            cookieAutoRefresh: 'off',
+            email: '',
+            passwordKeychainService: 'claude-hud-reclaude',
+        },
     },
     colors: {
         context: 'green',
@@ -270,6 +283,24 @@ function validateFreshnessMs(value) {
     }
     return Math.max(0, Math.floor(value));
 }
+function validatePositiveMs(value, fallback) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+        return fallback;
+    }
+    return Math.floor(value);
+}
+function validateNonEmptyString(value, fallback) {
+    if (typeof value !== 'string')
+        return fallback;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : fallback;
+}
+function validateAutoRefresh(value) {
+    if (value === 'off' || value === 'chrome' || value === 'credentials' || value === 'chrome+credentials') {
+        return value;
+    }
+    return DEFAULT_CONFIG.display.reclaude.cookieAutoRefresh;
+}
 export function mergeConfig(userConfig) {
     const migrated = migrateConfig(userConfig);
     const language = validateLanguage(migrated.language)
@@ -411,6 +442,24 @@ export function mergeConfig(userConfig) {
         timeFormat: validateTimeFormat(migrated.display?.timeFormat)
             ? migrated.display.timeFormat
             : DEFAULT_CONFIG.display.timeFormat,
+        reclaude: {
+            enabled: typeof migrated.display?.reclaude?.enabled === 'boolean'
+                ? migrated.display.reclaude.enabled
+                : DEFAULT_CONFIG.display.reclaude.enabled,
+            cookie: typeof migrated.display?.reclaude?.cookie === 'string'
+                ? migrated.display.reclaude.cookie.trim()
+                : DEFAULT_CONFIG.display.reclaude.cookie,
+            apiUrl: validateNonEmptyString(migrated.display?.reclaude?.apiUrl, DEFAULT_CONFIG.display.reclaude.apiUrl),
+            cachePath: validateNonEmptyString(migrated.display?.reclaude?.cachePath, DEFAULT_CONFIG.display.reclaude.cachePath),
+            cacheTTLMs: validatePositiveMs(migrated.display?.reclaude?.cacheTTLMs, DEFAULT_CONFIG.display.reclaude.cacheTTLMs),
+            maxStaleMs: validatePositiveMs(migrated.display?.reclaude?.maxStaleMs, DEFAULT_CONFIG.display.reclaude.maxStaleMs),
+            fetchTimeoutMs: validatePositiveMs(migrated.display?.reclaude?.fetchTimeoutMs, DEFAULT_CONFIG.display.reclaude.fetchTimeoutMs),
+            cookieAutoRefresh: validateAutoRefresh(migrated.display?.reclaude?.cookieAutoRefresh),
+            email: typeof migrated.display?.reclaude?.email === 'string'
+                ? migrated.display.reclaude.email.trim()
+                : DEFAULT_CONFIG.display.reclaude.email,
+            passwordKeychainService: validateNonEmptyString(migrated.display?.reclaude?.passwordKeychainService, DEFAULT_CONFIG.display.reclaude.passwordKeychainService),
+        },
     };
     const colors = {
         context: validateColorValue(migrated.colors?.context)

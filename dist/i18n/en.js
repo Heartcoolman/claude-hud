@@ -3,6 +3,7 @@ export const en = {
     "label.context": "Context",
     "label.usage": "Usage",
     "label.weekly": "Weekly",
+    "label.proxy": "ReClaude",
     "label.approxRam": "Approx RAM",
     "label.promptCache": "Cache",
     "label.rules": "rules",
@@ -14,6 +15,7 @@ export const en = {
     "status.limitReached": "Limit reached",
     "status.allTodosComplete": "All todos complete",
     "status.expired": "expired",
+    "status.loginRequired": "login required",
     // Format
     "format.resets": "resets",
     "format.resetsIn": "resets in",

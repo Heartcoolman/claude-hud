@@ -13,6 +13,7 @@ import {
   renderEnvironmentLine,
   renderPromptCacheLine,
   renderUsageLine,
+  renderProxyLine,
   renderMemoryLine,
   renderSessionTokensLine,
 } from './lines/index.js';
@@ -363,6 +364,8 @@ function renderElementLine(
       return renderIdentityLine(ctx, alignProgressLabels);
     case 'usage':
       return renderUsageLine(ctx, alignProgressLabels);
+    case 'proxy':
+      return renderProxyLine(ctx, alignProgressLabels);
     case 'promptCache':
       return renderPromptCacheLine(ctx);
     case 'memory':

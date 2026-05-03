@@ -5,6 +5,7 @@ export const zh: Messages = {
   "label.context": "上下文",
   "label.usage": "用量",
   "label.weekly": "本周",
+  "label.proxy": "ReClaude",
   "label.approxRam": "内存",
   "label.promptCache": "缓存",
   "label.rules": "规则",
@@ -17,6 +18,7 @@ export const zh: Messages = {
   "status.limitReached": "已达上限",
   "status.allTodosComplete": "全部完成",
   "status.expired": "已过期",
+  "status.loginRequired": "需重新登录",
 
   // Format
   "format.resets": "重置于",

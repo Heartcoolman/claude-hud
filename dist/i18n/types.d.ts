@@ -1,4 +1,4 @@
-export type MessageKey = "label.context" | "label.usage" | "label.weekly" | "label.approxRam" | "label.promptCache" | "label.rules" | "label.hooks" | "label.estimatedCost" | "label.cost" | "label.tokens" | "status.limitReached" | "status.allTodosComplete" | "status.expired" | "format.resets" | "format.resetsIn" | "format.at" | "format.in" | "format.cache" | "format.out" | "format.tok" | "format.tokPerSec" | "init.initializing" | "init.macosNote";
+export type MessageKey = "label.context" | "label.usage" | "label.weekly" | "label.proxy" | "label.approxRam" | "label.promptCache" | "label.rules" | "label.hooks" | "label.estimatedCost" | "label.cost" | "label.tokens" | "status.limitReached" | "status.allTodosComplete" | "status.expired" | "status.loginRequired" | "format.resets" | "format.resetsIn" | "format.at" | "format.in" | "format.cache" | "format.out" | "format.tok" | "format.tokPerSec" | "init.initializing" | "init.macosNote";
 export type Messages = Record<MessageKey, string>;
 export type Language = "en" | "zh";
 //# sourceMappingURL=types.d.ts.map

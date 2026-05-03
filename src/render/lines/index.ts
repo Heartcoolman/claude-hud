@@ -4,5 +4,6 @@ export { renderAddedDirsLine } from './added-dirs.js';
 export { renderEnvironmentLine } from './environment.js';
 export { renderPromptCacheLine, formatPromptCacheCountdown } from './prompt-cache.js';
 export { renderUsageLine } from './usage.js';
+export { renderProxyLine } from './proxy.js';
 export { renderMemoryLine } from './memory.js';
 export { renderSessionTokensLine } from './session-tokens.js';

@@ -10,10 +10,12 @@ import { getMemoryUsage } from "./memory.js";
 import { resolveEffortLevel } from "./effort.js";
 import { applyContextWindowFallback } from "./context-cache.js";
 import { getUsageFromExternalSnapshot } from "./external-usage.js";
+import { getProxyUsage, getProxyAuthStatus } from "./proxy-usage.js";
 import { setLanguage, t } from "./i18n/index.js";
 import type { RenderContext } from "./types.js";
 
 export { getUsageFromExternalSnapshot } from "./external-usage.js";
+export { getProxyUsage, getProxyAuthStatus } from "./proxy-usage.js";
 import { fileURLToPath } from "node:url";
 import { realpathSync } from "node:fs";
 
@@ -21,6 +23,8 @@ export type MainDeps = {
   readStdin: typeof readStdin;
   getUsageFromStdin: typeof getUsageFromStdin;
   getUsageFromExternalSnapshot: typeof getUsageFromExternalSnapshot;
+  getProxyUsage: typeof getProxyUsage;
+  getProxyAuthStatus: typeof getProxyAuthStatus;
   parseTranscript: typeof parseTranscript;
   countConfigs: typeof countConfigs;
   getGitStatus: typeof getGitStatus;
@@ -40,6 +44,8 @@ export async function main(overrides: Partial<MainDeps> = {}): Promise<void> {
     readStdin,
     getUsageFromStdin,
     getUsageFromExternalSnapshot,
+    getProxyUsage,
+    getProxyAuthStatus,
     parseTranscript,
     countConfigs,
     getGitStatus,
@@ -95,6 +101,15 @@ export async function main(overrides: Partial<MainDeps> = {}): Promise<void> {
       }
     }
 
+    const proxyUsage: RenderContext["proxyUsage"] =
+      config.display.showUsage !== false
+        ? deps.getProxyUsage(config, deps.now())
+        : null;
+    const proxyAuthStatus: RenderContext["proxyAuthStatus"] =
+      config.display.showUsage !== false
+        ? deps.getProxyAuthStatus(config, deps.now())
+        : null;
+
     const extraCmd = deps.parseExtraCmdArg();
     const extraLabel = extraCmd ? await deps.runExtraCmd(extraCmd) : null;
 
@@ -123,6 +138,8 @@ export async function main(overrides: Partial<MainDeps> = {}): Promise<void> {
       sessionDuration,
       gitStatus,
       usageData,
+      proxyUsage,
+      proxyAuthStatus,
       memoryUsage,
       config,
       extraLabel,

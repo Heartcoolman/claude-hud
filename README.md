@@ -70,6 +70,91 @@ On Windows, make that a full Claude Code restart after setup writes the new `sta
 
 ---
 
+## ReClaude carpool quota integration (fork-only, macOS)
+
+This fork adds a **`ReClaude`** line below `Context | Usage` showing your
+[reclaude.ai](https://reclaude.ai) carpool 5h quota — both the USD spend
+bar and the time-elapsed bar — fetched directly from reclaude's billing API.
+
+### Setup
+
+```
+/claude-hud:reclaude-setup
+```
+
+The wizard walks you through:
+
+1. Entering your reclaude.ai email
+2. Running a one-line helper script that stores your password in the **macOS
+   Keychain** (the password never passes through Claude Code itself)
+3. Auto-merging `display.reclaude` into `~/.claude/plugins/claude-hud/config.json`
+4. A first fetch + visible success/failure feedback
+
+After setup the statusline looks like:
+
+```
+[Opus] │ my-project git:(main*)
+Context ███░░░░░░░ 29% │ Usage ███░░░░░░░ 26% (38m / 5h)
+ReClaude $ █████░░░░░ 47% ($23.69/$50) | ⏱ ██░░░░░░░░ 21% (3h 57m / 5h)
+```
+
+### How auto-refresh works
+
+Every 60 s, the fetcher tries the cached cookie first. If reclaude returns 401,
+it POSTs `{email, password}` (password retrieved from Keychain via the
+`security` CLI) to `/api/auth/login`, captures the new `Set-Cookie: rc_sid=...`
+header, atomically writes the new value into your config, and the next
+statusline tick shows fresh data. Zero browser interaction.
+
+A **5-minute cooldown** protects reclaude.ai from credential-stuffing on a
+permanently bad password.
+
+### Manual cookie path (Linux / Windows)
+
+Auto-refresh requires the macOS Keychain, so it's macOS-only. Other platforms
+can still show ReClaude data by manually pasting a fresh cookie:
+
+1. Open `https://reclaude.ai/app` in your browser, ensure you're logged in
+2. DevTools → **Application** → **Cookies** → `reclaude.ai` → copy `rc_sid`
+3. Edit `~/.claude/plugins/claude-hud/config.json`:
+   ```json
+   {
+     "display": {
+       "reclaude": {
+         "enabled": true,
+         "cookie": "rc_sid=PASTE_VALUE_HERE"
+       }
+     }
+   }
+   ```
+4. Refresh manually whenever it expires (typically days, but session can be
+   invalidated when you log in elsewhere)
+
+### Disable
+
+```bash
+# 1. Remove the reclaude block from config:
+$EDITOR ~/.claude/plugins/claude-hud/config.json
+
+# 2. Forget the password (macOS):
+security delete-generic-password -a YOUR_EMAIL -s claude-hud-reclaude
+
+# 3. Clear caches and sentinels:
+rm -rf ~/.cache/claude-hud
+```
+
+### Security notes
+
+- `email` lives in plaintext in `config.json` (chmod 600 by default).
+- `password` is **never** written to disk by claude-hud; only the Keychain
+  holds it. The fetcher reads it on demand via `security find-generic-password`.
+- `rc_sid` cookies are short-lived and rotate automatically; treat them like
+  passwords (chmod 600 already enforced on `config.json`).
+- The fetcher only hits two endpoints: `GET /api/app/billing/carpool-quota`
+  and `POST /api/auth/login`. No conversation data is ever transmitted.
+
+---
+
 ## What is Claude HUD?
 
 Claude HUD gives you better insights into what's happening in your Claude Code session.
