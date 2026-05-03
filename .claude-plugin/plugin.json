@@ -1,17 +1,18 @@
 {
   "name": "claude-hud",
-  "description": "Real-time statusline HUD for Claude Code - context health, tool activity, agent tracking, and todo progress",
+  "description": "Real-time statusline HUD for Claude Code - context health, tool activity, agent tracking, and todo progress (Heartcoolman fork: adds reclaude.ai carpool quota integration)",
   "version": "0.1.0",
   "author": {
-    "name": "Jarrod Watts",
-    "url": "https://github.com/jarrodwatts"
+    "name": "Jarrod Watts (original) / Heartcoolman (fork)",
+    "url": "https://github.com/Heartcoolman/claude-hud"
   },
   "commands": [
     "./commands/setup.md",
-    "./commands/configure.md"
+    "./commands/configure.md",
+    "./commands/reclaude-setup.md"
   ],
-  "homepage": "https://github.com/jarrodwatts/claude-hud",
-  "repository": "https://github.com/jarrodwatts/claude-hud",
+  "homepage": "https://github.com/Heartcoolman/claude-hud",
+  "repository": "https://github.com/Heartcoolman/claude-hud",
   "license": "MIT",
-  "keywords": ["hud", "monitoring", "statusline", "context", "tools", "agents", "todos", "claude-code"]
+  "keywords": ["hud", "monitoring", "statusline", "context", "tools", "agents", "todos", "claude-code", "reclaude"]
 }
