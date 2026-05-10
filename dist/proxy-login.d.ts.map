@@ -1,0 +1,1 @@
+{"version":3,"file":"proxy-login.d.ts","sourceRoot":"","sources":["../src/proxy-login.ts"],"names":[],"mappings":"AA6JA,MAAM,WAAW,iBAAiB;IAChC,KAAK,EAAE,MAAM,CAAC;IACd,uBAAuB,EAAE,MAAM,CAAC;IAChC,QAAQ,EAAE,MAAM,CAAC;IACjB,SAAS,EAAE,MAAM,CAAC;IAClB,GAAG,CAAC,EAAE,MAAM,CAAC;CACd;AAED;;;GAGG;AACH,wBAAsB,oBAAoB,CACxC,KAAK,EAAE,iBAAiB,GACvB,OAAO,CAAC,MAAM,GAAG,IAAI,CAAC,CAkDxB"}

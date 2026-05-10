@@ -12,7 +12,7 @@ export type GitBranchOverflowMode = 'truncate' | 'wrap';
  */
 export type ModelFormatMode = 'full' | 'compact' | 'short';
 export type TimeFormatMode = 'relative' | 'absolute' | 'both';
-export type HudElement = 'project' | 'addedDirs' | 'context' | 'usage' | 'promptCache' | 'memory' | 'environment' | 'tools' | 'agents' | 'todos';
+export type HudElement = 'project' | 'addedDirs' | 'context' | 'usage' | 'proxy' | 'promptCache' | 'memory' | 'environment' | 'tools' | 'agents' | 'todos';
 export type AddedDirsLayout = 'inline' | 'line';
 export type HudColorName = 'dim' | 'red' | 'green' | 'yellow' | 'magenta' | 'cyan' | 'brightBlue' | 'brightMagenta';
 /** A color value: named preset, 256-color index (0-255), or hex string (#rrggbb). */
@@ -91,6 +91,18 @@ export interface HudConfig {
         modelOverride: string;
         customLine: string;
         timeFormat: TimeFormatMode;
+        reclaude: {
+            enabled: boolean;
+            cookie: string;
+            apiUrl: string;
+            cachePath: string;
+            cacheTTLMs: number;
+            maxStaleMs: number;
+            fetchTimeoutMs: number;
+            cookieAutoRefresh: 'off' | 'chrome' | 'credentials' | 'chrome+credentials';
+            email: string;
+            passwordKeychainService: string;
+        };
     };
     colors: HudColorOverrides;
 }
