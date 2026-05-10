@@ -77,7 +77,7 @@ export function getProxyUsage(
     cfg.email !== '';
   const canRefreshFromChrome =
     (cfg.cookieAutoRefresh === 'chrome' || cfg.cookieAutoRefresh === 'chrome+credentials') &&
-    process.platform === 'darwin';
+    (process.platform === 'darwin' || process.platform === 'win32');
   if (!cfg.cookie && !canRefreshFromCredentials && !canRefreshFromChrome) return null;
 
   const cachePath = expandHome(cfg.cachePath);
@@ -159,34 +159,49 @@ function maybeKickFetch(
   try {
     const lockMtime = fs.statSync(lockPath).mtimeMs;
     if (now - lockMtime < LOCK_TIMEOUT_MS) return; // another fetch in flight
+    // Stale lock — clear it before re-acquiring (best-effort).
+    try { fs.unlinkSync(lockPath); } catch { /* ignore */ }
   } catch {
     /* no lock — proceed */
   }
 
   try {
     fs.mkdirSync(path.dirname(cachePath), { recursive: true });
-    fs.writeFileSync(lockPath, String(now));
+    // 'wx' = exclusive create; if another process won the race, this throws
+    // and we bail (their fetcher will populate the cache).
+    const fd = fs.openSync(lockPath, 'wx', 0o600);
+    try { fs.writeFileSync(fd, String(now)); } finally { fs.closeSync(fd); }
   } catch {
     return;
   }
 
   try {
     const fetcherPath = resolveFetcherPath();
+    // Secrets (cookie, email, keychain service name) are passed via env vars
+    // rather than argv so they don't appear in the system process table
+    // (Task Manager / `ps -ef` / wmic).
     const child = spawn(
       process.execPath,
       [
         fetcherPath,
-        '--cookie', cfg.cookie,
         '--url', cfg.apiUrl,
         '--cache', cachePath,
         '--lock', lockPath,
         '--timeout-ms', String(cfg.fetchTimeoutMs),
         '--config', getConfigPath(),
         '--auto-refresh', cfg.cookieAutoRefresh,
-        '--email', cfg.email,
-        '--keychain-service', cfg.passwordKeychainService,
       ],
-      { detached: true, stdio: 'ignore' },
+      {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+        env: {
+          ...process.env,
+          CLAUDE_HUD_RECLAUDE_COOKIE: cfg.cookie,
+          CLAUDE_HUD_RECLAUDE_EMAIL: cfg.email,
+          CLAUDE_HUD_RECLAUDE_KEYCHAIN: cfg.passwordKeychainService,
+        },
+      },
     );
     child.unref();
   } catch {

@@ -19,6 +19,14 @@ export const DEFAULT_MERGE_GROUPS = [
     ['context', 'usage'],
 ];
 const KNOWN_ELEMENTS = new Set(DEFAULT_ELEMENT_ORDER);
+function defaultProxyCachePath() {
+    if (process.platform === 'win32') {
+        const local = process.env.LOCALAPPDATA;
+        if (local)
+            return path.join(local, 'claude-hud', 'reclaude-quota.json');
+    }
+    return '~/.cache/claude-hud/reclaude-quota.json';
+}
 export const DEFAULT_CONFIG = {
     language: 'en',
     lineLayout: 'expanded',
@@ -80,7 +88,7 @@ export const DEFAULT_CONFIG = {
             enabled: false,
             cookie: '',
             apiUrl: 'https://reclaude.ai/api/app/billing/carpool-quota',
-            cachePath: '~/.cache/claude-hud/reclaude-quota.json',
+            cachePath: defaultProxyCachePath(),
             cacheTTLMs: 60000,
             maxStaleMs: 600000,
             fetchTimeoutMs: 5000,

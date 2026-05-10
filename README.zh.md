@@ -10,7 +10,7 @@
 > 🌐 [English README](README.md) | 中文文档
 >
 > 🔀 本仓库 fork 自 [jarrodwatts/claude-hud](https://github.com/jarrodwatts/claude-hud)，
-> 新增了 **ReClaude 拼车配额接入**（见下方 [ReClaude 章节](#reclaude-拼车配额接入fork-专属仅-macos)）。
+> 新增了 **ReClaude 拼车配额接入**（见下方 [ReClaude 章节](#reclaude-拼车配额接入fork-专属)）。
 
 ## 安装
 
@@ -72,11 +72,18 @@ winget install OpenJS.NodeJS.LTS
 
 ---
 
-## ReClaude 拼车配额接入（fork 专属、仅 macOS）
+## ReClaude 拼车配额接入（fork 专属）
 
 本 fork 在 `Context | Usage` 之下额外渲染一行 **`ReClaude`**，显示
 [reclaude.ai](https://reclaude.ai) 拼车 5 小时配额——**金额进度条** + **时间进度条**——
 直接从 reclaude 的计费接口拉取。
+
+> ⚠️ **Windows 平台未经实测验证。** macOS 路径已端到端跑通；Windows 路径
+> （PowerShell `CredWriteW` / `CredReadW`、Chrome DPAPI cookie 解密）已实现
+> 并通过代码审计，但**未在真实 Windows 主机上运行验证**——维护者目前没有
+> Windows 测试环境。如遇任何问题请在
+> [Heartcoolman/claude-hud/issues](https://github.com/Heartcoolman/claude-hud/issues)
+> 反馈。
 
 ### 安装
 
@@ -87,8 +94,8 @@ winget install OpenJS.NodeJS.LTS
 向导会引导你：
 
 1. 输入你的 reclaude.ai 邮箱
-2. 在终端里跑一行小脚本，把密码存入 **macOS Keychain**
-   （**密码全程不经过 Claude Code 本身**）
+2. 在终端里跑一行小脚本，把密码存入系统凭据库（**macOS Keychain** 或
+   **Windows 凭据管理器**）——**密码全程不经过 Claude Code 本身**
 3. 自动把 `display.reclaude` 块合并进 `~/.claude/plugins/claude-hud/config.json`，
    保留你已有的所有其他配置项不变
 4. 立即触发首次 fetch，并显示成功 / 失败的可见反馈
@@ -105,7 +112,7 @@ ReClaude $ █████░░░░░ 47% ($23.69/$50) | ⏱ ██░░░
 
 每 60 秒 fetcher 优先用缓存里的 cookie 拉一次。一旦 reclaude 返回 401：
 
-1. 自动 POST `{email, password}`（密码通过 `security` CLI 从 Keychain 取出）到 `/api/auth/login`
+1. 自动 POST `{email, password}` 到 `/api/auth/login`：密码在 macOS 上通过 `security` CLI 从 Keychain 取出，在 Windows 上通过 PowerShell `CredReadW` 从凭据管理器取出
 2. 抓取返回的 `Set-Cookie: rc_sid=...` 写回你的 config（**原子写入**、保留其它字段）
 3. 用新 cookie 重发请求、缓存数据
 4. 下一次状态栏 tick 即显示新数据
@@ -113,9 +120,9 @@ ReClaude $ █████░░░░░ 47% ($23.69/$50) | ⏱ ██░░░
 整套流程**无需任何浏览器交互**。同时为防止持续错误密码下打爆登录接口，连续 401
 触发 **5 分钟冷却**。
 
-### 手动 cookie 路径（Linux / Windows）
+### 手动 cookie 路径（Linux / 不支持的 shell）
 
-自动刷新依赖 macOS Keychain，所以仅 macOS 可用。其它平台仍可手动贴 cookie 渲染：
+自动刷新依赖 macOS Keychain 或 Windows 凭据管理器。在 Linux（以及无法访问系统凭据库的 shell）上，你仍可通过手动粘贴 cookie 来渲染 ReClaude 数据：
 
 1. 浏览器访问 `https://reclaude.ai/app`，确认已登录
 2. DevTools → **Application** → **Cookies** → `reclaude.ai` → 复制 `rc_sid` 值
@@ -138,8 +145,11 @@ ReClaude $ █████░░░░░ 47% ($23.69/$50) | ⏱ ██░░░
 # 1. 编辑 config.json 删掉 "reclaude" 块：
 $EDITOR ~/.claude/plugins/claude-hud/config.json
 
-# 2. 从 Keychain 移除密码（macOS）：
+# 2. 移除密码：
+# macOS：
 security delete-generic-password -a 你的邮箱 -s claude-hud-reclaude
+# Windows（PowerShell）：
+cmdkey /delete:claude-hud-reclaude:你的邮箱
 
 # 3. 清理缓存与 sentinel：
 rm -rf ~/.cache/claude-hud
@@ -148,8 +158,9 @@ rm -rf ~/.cache/claude-hud
 ### 安全说明
 
 - `email` 以明文存于 `config.json`（默认 `chmod 600`）
-- `password` **永远不被 claude-hud 写入磁盘**；仅 Keychain 持有，fetcher 在每次需要时
-  通过 `security find-generic-password` 临时读取
+- `password` **永远不被 claude-hud 写入磁盘**；仅由 macOS Keychain 或 Windows 凭据管理器持有。
+  fetcher 在每次需要登录时，macOS 通过 `security find-generic-password` 读取，
+  Windows 通过 PowerShell `CredReadW`（target = `claude-hud-reclaude:<email>`）读取
 - `rc_sid` cookie 短时间内有效、自动轮转；视为密码处理（`config.json` 已 `chmod 600`）
 - fetcher 仅访问两个接口：`GET /api/app/billing/carpool-quota` 与
   `POST /api/auth/login`，**不会传输任何对话数据**

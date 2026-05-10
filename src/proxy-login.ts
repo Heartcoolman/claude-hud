@@ -4,11 +4,16 @@
  * POST email + password to reclaude.ai's auth endpoint, parse the Set-Cookie
  * response, return the rc_sid value.
  *
- * Security:
- *   - Password comes from macOS Keychain via `security` CLI (never stored
- *     in config.json, never written to disk by claude-hud).
- *   - Failed logins use a 5-minute cooldown to avoid hammering the API on
- *     persistent 401 (e.g. expired password).
+ * Password sources (never stored on disk by claude-hud):
+ *   - macOS: `security find-generic-password` against the user's Keychain.
+ *   - Windows: PowerShell P/Invoke of advapi32!CredReadW against the user's
+ *     Credential Manager (Generic credential, target = "<service>:<account>"
+ *     when account is set, else "<service>"). The CRED_TYPE_GENERIC blob is
+ *     decoded as UTF-16LE inside PowerShell and re-emitted as UTF-8 base64,
+ *     so Node only ever sees UTF-8.
+ *
+ * Failed logins use a 5-minute cooldown to avoid hammering the API on
+ * persistent 401 (e.g. expired password).
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -22,11 +27,10 @@ const KEYCHAIN_TIMEOUT_MS = 8_000;
 const COOLDOWN_FILE = 'reclaude-login-cooldown';
 const COOLDOWN_MS = 5 * 60_000;
 
-async function getKeychainPassword(
+async function getMacKeychainPassword(
   service: string,
   account: string,
 ): Promise<string | null> {
-  if (process.platform !== 'darwin') return null;
   try {
     const { stdout } = await execFileP(
       'security',
@@ -38,6 +42,77 @@ async function getKeychainPassword(
   } catch {
     return null;
   }
+}
+
+// Microsoft's CRED_TYPE_GENERIC blob is documented as UTF-16LE (LPWSTR).
+// Decode inside PowerShell and re-emit the password as base64 of UTF-8 bytes
+// so the Node side never has to guess the encoding (the previous
+// `blob.includes(0)` heuristic mis-classified non-Latin BMP UTF-16 passwords
+// such as Chinese, where neither byte of a code unit is 0x00).
+const WIN_CRED_PS_SCRIPT = `
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class CM {
+  [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+  public static extern bool CredReadW(string target, int type, int flags, out IntPtr cred);
+  [DllImport("advapi32.dll")] public static extern void CredFree(IntPtr buf);
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+  public struct CRED {
+    public int Flags; public int Type; public IntPtr TargetName;
+    public IntPtr Comment; public long LastWritten;
+    public int CredentialBlobSize; public IntPtr CredentialBlob;
+    public int Persist; public int AttributeCount; public IntPtr Attributes;
+    public IntPtr TargetAlias; public IntPtr UserName;
+  }
+}
+'@
+$ptr = [IntPtr]::Zero
+if ([CM]::CredReadW($env:CH_TARGET, 1, 0, [ref]$ptr)) {
+  try {
+    $cred = [Runtime.InteropServices.Marshal]::PtrToStructure($ptr, [CM+CRED])
+    if ($cred.CredentialBlobSize -gt 0) {
+      $buf = New-Object byte[] $cred.CredentialBlobSize
+      [Runtime.InteropServices.Marshal]::Copy($cred.CredentialBlob, $buf, 0, $cred.CredentialBlobSize)
+      $plain = [System.Text.Encoding]::Unicode.GetString($buf).TrimEnd([char]0)
+      [Console]::Out.Write([Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($plain)))
+    }
+  } finally { [CM]::CredFree($ptr) }
+}
+`.trim();
+
+async function getWinCredentialPassword(
+  service: string,
+  account: string,
+): Promise<string | null> {
+  const target = account ? `${service}:${account}` : service;
+  const encoded = Buffer.from(WIN_CRED_PS_SCRIPT, 'utf16le').toString('base64');
+  try {
+    const { stdout } = await execFileP(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded],
+      {
+        timeout: KEYCHAIN_TIMEOUT_MS,
+        env: { ...process.env, CH_TARGET: target },
+        windowsHide: true,
+      },
+    );
+    const out = stdout.trim();
+    if (!out) return null;
+    return Buffer.from(out, 'base64').toString('utf8') || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getKeychainPassword(
+  service: string,
+  account: string,
+): Promise<string | null> {
+  if (process.platform === 'darwin') return getMacKeychainPassword(service, account);
+  if (process.platform === 'win32') return getWinCredentialPassword(service, account);
+  return null;
 }
 
 function parseRcSidFromSetCookie(setCookieHeaders: string[] | string): string | null {

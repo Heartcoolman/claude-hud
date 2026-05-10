@@ -71,6 +71,14 @@ export const DEFAULT_MERGE_GROUPS: HudElement[][] = [
 
 const KNOWN_ELEMENTS = new Set<HudElement>(DEFAULT_ELEMENT_ORDER);
 
+function defaultProxyCachePath(): string {
+  if (process.platform === 'win32') {
+    const local = process.env.LOCALAPPDATA;
+    if (local) return path.join(local, 'claude-hud', 'reclaude-quota.json');
+  }
+  return '~/.cache/claude-hud/reclaude-quota.json';
+}
+
 export interface HudConfig {
   language: Language;
   lineLayout: LineLayoutType;
@@ -205,7 +213,7 @@ export const DEFAULT_CONFIG: HudConfig = {
       enabled: false,
       cookie: '',
       apiUrl: 'https://reclaude.ai/api/app/billing/carpool-quota',
-      cachePath: '~/.cache/claude-hud/reclaude-quota.json',
+      cachePath: defaultProxyCachePath(),
       cacheTTLMs: 60000,
       maxStaleMs: 600000,
       fetchTimeoutMs: 5000,

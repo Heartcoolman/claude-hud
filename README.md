@@ -11,7 +11,7 @@ A Claude Code plugin that shows what's happening — context usage, active tools
 >
 > 🔀 **Fork** of [jarrodwatts/claude-hud](https://github.com/jarrodwatts/claude-hud)
 > with the **ReClaude carpool quota integration** added (see the
-> [ReClaude section](#reclaude-carpool-quota-integration-fork-only-macos) below).
+> [ReClaude section](#reclaude-carpool-quota-integration-fork-only) below).
 
 ## Install
 
@@ -74,11 +74,18 @@ On Windows, make that a full Claude Code restart after setup writes the new `sta
 
 ---
 
-## ReClaude carpool quota integration (fork-only, macOS)
+## ReClaude carpool quota integration (fork-only)
 
 This fork adds a **`ReClaude`** line below `Context | Usage` showing your
 [reclaude.ai](https://reclaude.ai) carpool 5h quota — both the USD spend
 bar and the time-elapsed bar — fetched directly from reclaude's billing API.
+
+> ⚠️ **Windows support is unverified.** The macOS path has been exercised
+> end-to-end; the Windows path (PowerShell `CredWriteW` / `CredReadW`,
+> Chrome DPAPI cookie decrypt) was implemented and reviewed but **has not
+> been run on a real Windows host** — there is no Windows test environment
+> available to the maintainer. Bug reports welcome at
+> [Heartcoolman/claude-hud/issues](https://github.com/Heartcoolman/claude-hud/issues).
 
 ### Setup
 
@@ -89,8 +96,9 @@ bar and the time-elapsed bar — fetched directly from reclaude's billing API.
 The wizard walks you through:
 
 1. Entering your reclaude.ai email
-2. Running a one-line helper script that stores your password in the **macOS
-   Keychain** (the password never passes through Claude Code itself)
+2. Running a one-line helper script that stores your password in your system's
+   secure store (**macOS Keychain** or **Windows Credential Manager**) — the
+   password never passes through Claude Code itself
 3. Auto-merging `display.reclaude` into `~/.claude/plugins/claude-hud/config.json`
 4. A first fetch + visible success/failure feedback
 
@@ -105,18 +113,20 @@ ReClaude $ █████░░░░░ 47% ($23.69/$50) | ⏱ ██░░░
 ### How auto-refresh works
 
 Every 60 s, the fetcher tries the cached cookie first. If reclaude returns 401,
-it POSTs `{email, password}` (password retrieved from Keychain via the
-`security` CLI) to `/api/auth/login`, captures the new `Set-Cookie: rc_sid=...`
+it POSTs `{email, password}` (password retrieved from the macOS Keychain via
+the `security` CLI, or from Windows Credential Manager via PowerShell
+`CredReadW`) to `/api/auth/login`, captures the new `Set-Cookie: rc_sid=...`
 header, atomically writes the new value into your config, and the next
 statusline tick shows fresh data. Zero browser interaction.
 
 A **5-minute cooldown** protects reclaude.ai from credential-stuffing on a
 permanently bad password.
 
-### Manual cookie path (Linux / Windows)
+### Manual cookie path (Linux / unsupported shells)
 
-Auto-refresh requires the macOS Keychain, so it's macOS-only. Other platforms
-can still show ReClaude data by manually pasting a fresh cookie:
+Auto-refresh requires macOS Keychain or Windows Credential Manager. On Linux
+(and on shells without access to the native credential store), you can still
+show ReClaude data by manually pasting a fresh cookie:
 
 1. Open `https://reclaude.ai/app` in your browser, ensure you're logged in
 2. DevTools → **Application** → **Cookies** → `reclaude.ai` → copy `rc_sid`
@@ -140,8 +150,11 @@ can still show ReClaude data by manually pasting a fresh cookie:
 # 1. Remove the reclaude block from config:
 $EDITOR ~/.claude/plugins/claude-hud/config.json
 
-# 2. Forget the password (macOS):
+# 2. Forget the password:
+# macOS:
 security delete-generic-password -a YOUR_EMAIL -s claude-hud-reclaude
+# Windows (PowerShell):
+cmdkey /delete:claude-hud-reclaude:YOUR_EMAIL
 
 # 3. Clear caches and sentinels:
 rm -rf ~/.cache/claude-hud
@@ -150,8 +163,10 @@ rm -rf ~/.cache/claude-hud
 ### Security notes
 
 - `email` lives in plaintext in `config.json` (chmod 600 by default).
-- `password` is **never** written to disk by claude-hud; only the Keychain
-  holds it. The fetcher reads it on demand via `security find-generic-password`.
+- `password` is **never** written to disk by claude-hud; only the macOS
+  Keychain or Windows Credential Manager holds it. The fetcher reads it on
+  demand via `security find-generic-password` (macOS) or PowerShell
+  `CredReadW` against target `claude-hud-reclaude:<email>` (Windows).
 - `rc_sid` cookies are short-lived and rotate automatically; treat them like
   passwords (chmod 600 already enforced on `config.json`).
 - The fetcher only hits two endpoints: `GET /api/app/billing/carpool-quota`

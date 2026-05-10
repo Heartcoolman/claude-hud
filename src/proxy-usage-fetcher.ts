@@ -42,8 +42,11 @@ function parseArgs(argv: string[]): FetcherArgs {
   }
   const timeoutMs = Number.parseInt(out['timeout-ms'] ?? '5000', 10);
   const ar = out['auto-refresh'] as FetcherArgs['autoRefresh'];
+  // Secrets travel via env vars so they don't appear in the system process
+  // table. `out['…']` argv fallbacks remain for the legacy / test invocation
+  // path but are ignored when the env var is set.
   return {
-    cookie: out['cookie'] ?? '',
+    cookie: process.env.CLAUDE_HUD_RECLAUDE_COOKIE ?? out['cookie'] ?? '',
     url: out['url'] ?? '',
     cache: out['cache'] ?? '',
     lock: out['lock'] ?? '',
@@ -51,8 +54,9 @@ function parseArgs(argv: string[]): FetcherArgs {
     configPath: out['config'] ?? '',
     autoRefresh:
       ar === 'chrome' || ar === 'credentials' || ar === 'chrome+credentials' ? ar : 'off',
-    email: out['email'] ?? '',
-    passwordKeychainService: out['keychain-service'] ?? '',
+    email: process.env.CLAUDE_HUD_RECLAUDE_EMAIL ?? out['email'] ?? '',
+    passwordKeychainService:
+      process.env.CLAUDE_HUD_RECLAUDE_KEYCHAIN ?? out['keychain-service'] ?? '',
   };
 }
 

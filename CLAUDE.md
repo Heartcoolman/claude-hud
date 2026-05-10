@@ -63,11 +63,18 @@ Claude Code → stdin JSON → parse → render lines → stdout → Claude Code
   `used_usd`, `quota_usd`, `resets_at_ms`, `enabled`, `status`.
 - Background fetcher (`proxy-usage-fetcher.ts`) is spawned **detached** every
   60 s when stale; never blocks the statusline render.
-- On 401: multi-tier auto-refresh (macOS only):
-  1. cached cookie → 2. Chrome cookie store decrypt (PBKDF2 + AES-128-CBC,
-     handles Chrome 130+ 32-byte SHA-256 prefix) → 3. POST credentials to
-     `/api/auth/login` (password from macOS Keychain via `security` CLI) →
-     4. write `*.error` sentinel → renderer shows `⚠ login required`.
+- On 401: multi-tier auto-refresh (macOS + Windows):
+  1. cached cookie → 2. Chrome cookie store decrypt
+     - macOS: `sqlite3` CLI + Keychain password + PBKDF2(saltysalt,1003,16,sha1)
+       + AES-128-CBC (handles Chrome 130+ 32-byte SHA-256 prefix).
+     - Windows: PowerShell P/Invoke of `winsqlite3.dll` + DPAPI Unprotect of
+       `Local State.os_crypt.encrypted_key` + AES-256-GCM v10. Chrome 127+ v20
+       (app-bound) cookies are skipped, falling through to Tier 3.
+  3. POST credentials to `/api/auth/login` — password sourced from macOS
+     Keychain (`security` CLI) or Windows Credential Manager (PowerShell
+     P/Invoke of `advapi32!CredReadW`; target = `<service>:<email>`; blob
+     decoded as UTF-16LE w/ UTF-8 fallback).
+  4. write `*.error` sentinel → renderer shows `⚠ login required`.
 - Successful auth rotates the new `rc_sid` atomically into user `config.json`.
 
 ### File Structure
@@ -84,7 +91,7 @@ src/
 ├── external-usage.ts         # Fallback usage snapshot file reader
 ├── proxy-usage.ts            # ReClaude cache reader + background fetch trigger
 ├── proxy-usage-fetcher.ts    # Detached subprocess: multi-tier fetch + cookie rotate
-├── proxy-chrome-cookie.ts    # macOS Chrome cookie store decrypt (Tier 2)
+├── proxy-chrome-cookie.ts    # Chrome cookie store decrypt — macOS (CBC) + Win (GCM via PS)
 ├── proxy-login.ts            # POST /api/auth/login + Keychain password (Tier 3)
 ├── proxy-config-update.ts    # Atomic write of rotated rc_sid back into config.json
 └── render/
