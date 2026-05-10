@@ -4,6 +4,8 @@ All notable changes to Claude HUD will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-10
+
 ### Added (Heartcoolman fork)
 
 > ⚠️ **Windows path is unverified.** macOS has been exercised end-to-end;
