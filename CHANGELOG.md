@@ -4,15 +4,40 @@ All notable changes to Claude HUD will be documented in this file.
 
 ## [Unreleased]
 
-### Synced from upstream (jarrodwatts/claude-hud, post-0.0.12)
-- feat: `balance_label` support for third-party model usage display (#541).
-- feat: session start date + last response timestamp display, new `sessionTime` HudElement (#537).
-- feat: `remaining` mode for usage value (#536).
-- fix: `git status` octal-escaped unicode paths rendered as garbled text (#543).
-- fix: invalidate stale transcript agent cache; use queue-operation timestamps for accurate background agent duration (#515).
-- fix: Windows + PowerShell `/claude-hud:setup` writes a `statusline.ps1` wrapper with guarded width fallback and corrected version-directory glob (#521, #538).
-- fix: detect `OSTYPE=msys` on win32 to use Git Bash command format (#532).
-- Added Windows PowerShell 5.1 guidance for writing `settings.json` without a UTF-8 BOM.
+## [0.2.1] - 2026-05-14
+
+Patch release that pulls in 30 upstream commits (`70ecdbf..6f7d073` from
+`jarrodwatts/claude-hud:main`, post-0.0.12) on top of the fork's 0.2.0
+ReClaude integration. Verified end-to-end after merge:
+`balance_label` swaps the Usage percentage for the raw third-party label;
+`usageValue: 'remaining'` flips 25 % used → 75 % shown; opted-in
+`sessionTime` renders `Started: … │ Last reply: Xm ago`; default-off
+behavior unchanged for existing users.
+
+### Added (from upstream)
+- `balance_label` field support on the external-usage snapshot for
+  third-party model usage display (#541).
+- `sessionTime` HudElement showing session start date and last response
+  timestamp, opt-in via `display.showSessionStartDate` /
+  `display.showLastResponseAt` (#537).
+- `display.usageValue: 'remaining'` mode that renders the unused portion
+  of the rate-limit window instead of the consumed portion (#536).
+
+### Fixed (from upstream)
+- `git status` octal-escaped unicode paths rendered as garbled text (#543).
+- Stale transcript agent cache + background agent duration computed from
+  queue-operation timestamps instead of wall clock (#515).
+- Windows + PowerShell `/claude-hud:setup` now writes a `statusline.ps1`
+  wrapper with a guarded width fallback and corrected version-directory
+  glob (#521, #538).
+- win32 with `OSTYPE=msys` now routes through Git Bash command format
+  instead of native PowerShell (#532).
+
+### Changed (Heartcoolman fork)
+- `HudElement` union widened to include both `proxy` (fork) and
+  `sessionTime` (upstream); `DEFAULT_ELEMENT_ORDER` extended accordingly.
+- `package-lock.json` version field synced to `0.2.1` (was lagging at
+  `0.1.0` since the 0.2.0 cut).
 
 ## [0.2.0] - 2026-05-10
 
