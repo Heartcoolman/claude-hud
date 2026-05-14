@@ -26,7 +26,7 @@ export async function getGitStatus(cwd) {
         let fileStats;
         let lineDiff;
         try {
-            const { stdout: statusOut } = await execFileAsync('git', ['--no-optional-locks', 'status', '--porcelain'], { cwd, timeout: 1000, encoding: 'utf8' });
+            const { stdout: statusOut } = await execFileAsync('git', ['-c', 'core.quotePath=false', '--no-optional-locks', 'status', '--porcelain'], { cwd, timeout: 1000, encoding: 'utf8' });
             const trimmed = statusOut.trim();
             isDirty = trimmed.length > 0;
             if (isDirty) {
@@ -39,7 +39,7 @@ export async function getGitStatus(cwd) {
         // Get per-file and total line diffs
         if (isDirty) {
             try {
-                const { stdout: numstatOut } = await execFileAsync('git', ['diff', '--numstat', 'HEAD'], { cwd, timeout: 2000, encoding: 'utf8' });
+                const { stdout: numstatOut } = await execFileAsync('git', ['-c', 'core.quotePath=false', 'diff', '--numstat', 'HEAD'], { cwd, timeout: 2000, encoding: 'utf8' });
                 const trackedPaths = new Set(fileStats?.trackedFiles.map((file) => file.fullPath) ?? []);
                 const { totalDiff, perFileDiff } = parseNumstat(numstatOut, trackedPaths);
                 lineDiff = totalDiff;

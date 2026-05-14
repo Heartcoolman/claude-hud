@@ -5,6 +5,7 @@ import { coloredBar, critical, git as gitColor, gitBranch as gitBranchColor, lab
 import { getAdaptiveBarWidth } from '../utils/terminal.js';
 import { renderCostEstimate } from './lines/cost.js';
 import { renderPromptCacheLine } from './lines/prompt-cache.js';
+import { renderSessionTimeLine } from './lines/session-time.js';
 import { t } from '../i18n/index.js';
 import { formatResetTime } from './format-reset-time.js';
 const DEBUG = process.env.DEBUG?.includes('claude-hud') || process.env.DEBUG === '*';
@@ -150,7 +151,11 @@ export function renderSessionLine(ctx) {
     if (display?.showUsage !== false && ctx.usageData && !shouldHideUsage(ctx.stdin)) {
         const usageCompact = display?.usageCompact ?? false;
         const showResetLabel = display?.showResetLabel ?? true;
-        if (isLimitReached(ctx.usageData)) {
+        const usageValueMode = display?.usageValue ?? 'percent';
+        if (ctx.usageData.balanceLabel) {
+            parts.push(`${label(t('label.usage'), colors)} ${ctx.usageData.balanceLabel}`);
+        }
+        else if (isLimitReached(ctx.usageData)) {
             const resetTime = ctx.usageData.fiveHour === 100
                 ? formatResetTime(ctx.usageData.fiveHourResetAt, timeFormat)
                 : formatResetTime(ctx.usageData.sevenDayResetAt, timeFormat);
@@ -175,11 +180,11 @@ export function renderSessionLine(ctx) {
                 const usageBarEnabled = display?.usageBarEnabled ?? true;
                 if (usageCompact) {
                     const fiveHourPart = fiveHour !== null
-                        ? formatCompactWindowPart('5h', fiveHour, ctx.usageData.fiveHourResetAt, timeFormat, colors)
+                        ? formatCompactWindowPart('5h', fiveHour, ctx.usageData.fiveHourResetAt, timeFormat, colors, usageValueMode)
                         : null;
                     const sevenDayThreshold = display?.sevenDayThreshold ?? 80;
                     const sevenDayPart = (sevenDay !== null && (fiveHour === null || sevenDay >= sevenDayThreshold))
-                        ? formatCompactWindowPart('7d', sevenDay, ctx.usageData.sevenDayResetAt, timeFormat, colors)
+                        ? formatCompactWindowPart('7d', sevenDay, ctx.usageData.sevenDayResetAt, timeFormat, colors, usageValueMode)
                         : null;
                     if (fiveHourPart && sevenDayPart) {
                         parts.push(fiveHourPart);
@@ -203,6 +208,7 @@ export function renderSessionLine(ctx) {
                         timeFormat,
                         showResetLabel,
                         forceLabel: true,
+                        usageValueMode,
                     });
                     parts.push(weeklyOnlyPart);
                 }
@@ -216,6 +222,7 @@ export function renderSessionLine(ctx) {
                         barWidth,
                         timeFormat,
                         showResetLabel,
+                        usageValueMode,
                     });
                     const sevenDayThreshold = display?.sevenDayThreshold ?? 80;
                     if (sevenDay !== null && sevenDay >= sevenDayThreshold) {
@@ -229,6 +236,7 @@ export function renderSessionLine(ctx) {
                             timeFormat,
                             showResetLabel,
                             forceLabel: true,
+                            usageValueMode,
                         });
                         parts.push(`${label(t('label.usage'), colors)} ${fiveHourPart}`);
                         parts.push(sevenDayPart);
@@ -279,6 +287,10 @@ export function renderSessionLine(ctx) {
     }
     if (display?.showDuration !== false && ctx.sessionDuration) {
         parts.push(label(`⏱️  ${ctx.sessionDuration}`, colors));
+    }
+    const sessionTimeLine = renderSessionTimeLine(ctx);
+    if (sessionTimeLine) {
+        parts.push(sessionTimeLine);
     }
     const promptCacheLine = renderPromptCacheLine(ctx);
     if (promptCacheLine) {
@@ -343,23 +355,24 @@ function formatContextValue(ctx, percent, mode) {
     }
     return `${percent}%`;
 }
-function formatCompactWindowPart(windowLabel, percent, resetAt, timeFormat, colors) {
-    const usageDisplay = formatUsagePercent(percent, colors);
+function formatCompactWindowPart(windowLabel, percent, resetAt, timeFormat, colors, usageValueMode = 'percent') {
+    const usageDisplay = formatUsagePercent(percent, colors, usageValueMode);
     const reset = formatResetTime(resetAt, timeFormat);
     const styledLabel = label(`${windowLabel}:`, colors);
     return reset
         ? `${styledLabel} ${usageDisplay} ${label(`(${reset})`, colors)}`
         : `${styledLabel} ${usageDisplay}`;
 }
-function formatUsagePercent(percent, colors) {
+function formatUsagePercent(percent, colors, mode = 'percent') {
     if (percent === null) {
         return label('--', colors);
     }
     const color = getQuotaColor(percent, colors);
-    return `${color}${percent}%${RESET}`;
+    const displayPercent = mode === 'remaining' ? Math.max(0, 100 - percent) : percent;
+    return `${color}${displayPercent}%${RESET}`;
 }
-function formatUsageWindowPart({ label: windowLabel, percent, resetAt, colors, usageBarEnabled, barWidth, timeFormat = 'relative', showResetLabel, forceLabel = false, }) {
-    const usageDisplay = formatUsagePercent(percent, colors);
+function formatUsageWindowPart({ label: windowLabel, percent, resetAt, colors, usageBarEnabled, barWidth, timeFormat = 'relative', showResetLabel, forceLabel = false, usageValueMode = 'percent', }) {
+    const usageDisplay = formatUsagePercent(percent, colors, usageValueMode);
     const reset = formatResetTime(resetAt, timeFormat);
     const styledLabel = label(windowLabel, colors);
     // "resets in X" for relative/both; "resets X" for absolute (avoids "resets in at 14:30")

@@ -69,6 +69,7 @@ export interface AgentEntry {
   status: 'running' | 'completed';
   startTime: Date;
   endTime?: Date;
+  background?: boolean;
 }
 
 export interface TodoItem {
@@ -81,6 +82,7 @@ export interface UsageData {
   sevenDay: number | null;  // 0-100 percentage, null if unavailable
   fiveHourResetAt: Date | null;
   sevenDayResetAt: Date | null;
+  balanceLabel?: string | null;  // optional raw balance text (e.g. "¥6.35")
 }
 
 export interface ExternalUsageSnapshot {
@@ -93,6 +95,7 @@ export interface ExternalUsageSnapshot {
     resets_at?: string | number | null;
   } | null;
   updated_at?: string | number | null;
+  balance_label?: string | null;
 }
 
 /**

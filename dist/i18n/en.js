@@ -11,6 +11,8 @@ export const en = {
     "label.estimatedCost": "Est.",
     "label.cost": "Cost",
     "label.tokens": "Tokens",
+    "label.sessionStarted": "Started",
+    "label.lastReply": "Last reply",
     // Status
     "status.limitReached": "Limit reached",
     "status.allTodosComplete": "All todos complete",
@@ -25,6 +27,8 @@ export const en = {
     "format.out": "out",
     "format.tok": "tok",
     "format.tokPerSec": "tok/s",
+    "format.justNow": "just now",
+    "format.ago": "ago",
     // Init
     "init.initializing": "[claude-hud] Initializing...",
     "init.macosNote": "[claude-hud] Note: On macOS, you may need to restart Claude Code for the HUD to appear.",

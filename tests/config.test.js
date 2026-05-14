@@ -57,6 +57,7 @@ test('loadConfig returns valid config structure', async () => {
   assert.equal(typeof config.display.showSpeed, 'boolean');
   assert.equal(typeof config.display.showTokenBreakdown, 'boolean');
   assert.equal(typeof config.display.showUsage, 'boolean');
+  assert.ok(['percent', 'remaining'].includes(config.display.usageValue), 'usageValue should be valid');
   assert.equal(typeof config.display.showTools, 'boolean');
   assert.equal(typeof config.display.showAgents, 'boolean');
   assert.equal(typeof config.display.showTodos, 'boolean');
@@ -447,6 +448,24 @@ test('mergeConfig falls back to default for invalid contextValue', () => {
     },
   });
   assert.equal(config.display.contextValue, DEFAULT_CONFIG.display.contextValue);
+});
+
+test('mergeConfig accepts usageValue=remaining', () => {
+  const config = mergeConfig({
+    display: {
+      usageValue: 'remaining',
+    },
+  });
+  assert.equal(config.display.usageValue, 'remaining');
+});
+
+test('mergeConfig falls back to default for invalid usageValue', () => {
+  const config = mergeConfig({
+    display: {
+      usageValue: 'tokens',
+    },
+  });
+  assert.equal(config.display.usageValue, DEFAULT_CONFIG.display.usageValue);
 });
 
 test('mergeConfig defaults elementOrder to the full expanded layout', () => {

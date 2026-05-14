@@ -6,7 +6,7 @@ import { critical, label, getQuotaColor, quotaBar, RESET } from "../colors.js";
 import { getAdaptiveBarWidth } from "../../utils/terminal.js";
 import { t } from "../../i18n/index.js";
 import { progressLabel } from "./label-align.js";
-import type { TimeFormatMode } from "../../config.js";
+import type { TimeFormatMode, UsageValueMode } from "../../config.js";
 import { formatResetTime } from "../format-reset-time.js";
 
 export function renderUsageLine(
@@ -29,10 +29,16 @@ export function renderUsageLine(
   }
 
   const usageLabel = progressLabel("label.usage", colors, alignLabels);
+
+  if (ctx.usageData.balanceLabel) {
+    return `${usageLabel} ${ctx.usageData.balanceLabel}`;
+  }
+
   const timeFormat: TimeFormatMode = display?.timeFormat ?? 'relative';
   const showResetLabel = display?.showResetLabel ?? true;
   const resetsKey = timeFormat === 'absolute' ? "format.resets" : "format.resetsIn";
   const usageCompact = display?.usageCompact ?? false;
+  const usageValueMode = display?.usageValue ?? 'percent';
 
   if (isLimitReached(ctx.usageData)) {
     const resetTime =
@@ -63,10 +69,10 @@ export function renderUsageLine(
 
   if (usageCompact) {
     const fiveHourPart = fiveHour !== null
-      ? formatCompactWindowPart("5h", fiveHour, ctx.usageData.fiveHourResetAt, timeFormat, colors)
+      ? formatCompactWindowPart("5h", fiveHour, ctx.usageData.fiveHourResetAt, timeFormat, colors, usageValueMode)
       : null;
     const sevenDayPart = (sevenDay !== null && (fiveHour === null || sevenDay >= sevenDayThreshold))
-      ? formatCompactWindowPart("7d", sevenDay, ctx.usageData.sevenDayResetAt, timeFormat, colors)
+      ? formatCompactWindowPart("7d", sevenDay, ctx.usageData.sevenDayResetAt, timeFormat, colors, usageValueMode)
       : null;
 
     if (fiveHourPart && sevenDayPart) {
@@ -91,6 +97,7 @@ export function renderUsageLine(
       showResetLabel,
       forceLabel: true,
       alignLabels,
+      usageValueMode,
     });
     return `${usageLabel} ${weeklyOnlyPart}`;
   }
@@ -104,6 +111,7 @@ export function renderUsageLine(
     barWidth,
     timeFormat,
     showResetLabel,
+    usageValueMode,
   });
 
   if (sevenDay !== null && sevenDay >= sevenDayThreshold) {
@@ -119,6 +127,7 @@ export function renderUsageLine(
       timeFormat,
       showResetLabel,
       alignLabels,
+      usageValueMode,
     });
     return `${usageLabel} ${fiveHourPart} | ${sevenDayPart}`;
   }
@@ -132,8 +141,9 @@ function formatCompactWindowPart(
   resetAt: Date | null,
   timeFormat: TimeFormatMode,
   colors?: RenderContext["config"]["colors"],
+  usageValueMode: UsageValueMode = 'percent',
 ): string {
-  const usageDisplay = formatUsagePercent(percent, colors);
+  const usageDisplay = formatUsagePercent(percent, colors, usageValueMode);
   const reset = formatResetTime(resetAt, timeFormat);
   const styledLabel = label(`${windowLabel}:`, colors);
   return reset
@@ -144,12 +154,14 @@ function formatCompactWindowPart(
 function formatUsagePercent(
   percent: number | null,
   colors?: RenderContext["config"]["colors"],
+  mode: UsageValueMode = 'percent',
 ): string {
   if (percent === null) {
     return label("--", colors);
   }
   const color = getQuotaColor(percent, colors);
-  return `${color}${percent}%${RESET}`;
+  const displayPercent = mode === 'remaining' ? Math.max(0, 100 - percent) : percent;
+  return `${color}${displayPercent}%${RESET}`;
 }
 
 function formatUsageWindowPart({
@@ -165,6 +177,7 @@ function formatUsageWindowPart({
   showResetLabel,
   forceLabel = false,
   alignLabels = false,
+  usageValueMode = 'percent',
 }: {
   label: string;
   labelKey?: MessageKey;
@@ -179,8 +192,9 @@ function formatUsageWindowPart({
   showResetLabel: boolean;
   forceLabel?: boolean;
   alignLabels?: boolean;
+  usageValueMode?: UsageValueMode;
 }): string {
-  const usageDisplay = formatUsagePercent(percent, colors);
+  const usageDisplay = formatUsagePercent(percent, colors, usageValueMode);
   const reset = formatResetTime(resetAt, timeFormat);
   const styledLabel = labelKey
     ? progressLabel(labelKey, colors, alignLabels)

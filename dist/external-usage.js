@@ -1,9 +1,29 @@
 import * as fs from 'node:fs';
+const MAX_BALANCE_LABEL_LENGTH = 50;
 function parseUsagePercent(value) {
     if (typeof value !== 'number' || !Number.isFinite(value)) {
         return null;
     }
     return Math.round(Math.min(100, Math.max(0, value)));
+}
+function sanitizeBalanceLabel(value) {
+    if (typeof value !== 'string') {
+        return null;
+    }
+    const sanitized = value
+        .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '')
+        .replace(/\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)/g, '')
+        .replace(/\x1B[@-Z\\-_]/g, '')
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+        .replace(/[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069\u206A-\u206F]/g, '')
+        .trim();
+    if (!sanitized) {
+        return null;
+    }
+    if (sanitized.length <= MAX_BALANCE_LABEL_LENGTH) {
+        return sanitized;
+    }
+    return `${sanitized.slice(0, MAX_BALANCE_LABEL_LENGTH - 3)}...`;
 }
 function parseDateValue(value) {
     if (typeof value === 'number') {
@@ -42,7 +62,8 @@ export function getUsageFromExternalSnapshot(config, now = Date.now()) {
         }
         const fiveHour = parseUsagePercent(parsed.five_hour?.used_percentage);
         const sevenDay = parseUsagePercent(parsed.seven_day?.used_percentage);
-        if (fiveHour === null && sevenDay === null) {
+        const balanceLabel = sanitizeBalanceLabel(parsed.balance_label);
+        if (fiveHour === null && sevenDay === null && balanceLabel === null) {
             return null;
         }
         const fiveHourResetAt = parseDateValue(parsed.five_hour?.resets_at);
@@ -53,12 +74,16 @@ export function getUsageFromExternalSnapshot(config, now = Date.now()) {
         if (parsed.seven_day && parsed.seven_day.resets_at != null && sevenDayResetAt === null) {
             return null;
         }
-        return {
+        const usage = {
             fiveHour,
             sevenDay,
             fiveHourResetAt,
             sevenDayResetAt,
         };
+        if (balanceLabel !== null) {
+            usage.balanceLabel = balanceLabel;
+        }
+        return usage;
     }
     catch {
         return null;

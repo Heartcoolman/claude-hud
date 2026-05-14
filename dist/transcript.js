@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import * as readline from 'readline';
 import { createHash } from 'node:crypto';
 import { getHudPluginDir } from './claude-config-dir.js';
-const TRANSCRIPT_CACHE_VERSION = 3;
+const TRANSCRIPT_CACHE_VERSION = 4;
 let createReadStreamImpl = fs.createReadStream;
 function normalizeTokenCount(value) {
     if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -153,6 +153,7 @@ export async function parseTranscript(transcriptPath) {
     const agentMap = new Map();
     let latestTodos = [];
     const taskIdToIndex = new Map();
+    const queueCompletionMap = new Map();
     let latestSlug;
     let customTitle;
     let lastCompactBoundaryAt;
@@ -205,6 +206,19 @@ export async function parseTranscript(transcriptPath) {
                         }
                     }
                 }
+                // Capture accurate background-agent completion timestamps from queue-operation entries.
+                // The tool_result timestamp in the parent transcript is written at launch time, not
+                // when the agent actually finishes, so we override with the enqueue timestamp.
+                if (entry.type === 'queue-operation' && entry.operation === 'enqueue' && entry.content) {
+                    const taskIdMatch = entry.content.match(/<task-id>([^<]+)<\/task-id>/);
+                    const toolUseIdMatch = entry.content.match(/<tool-use-id>([^<]+)<\/tool-use-id>/);
+                    if (taskIdMatch && toolUseIdMatch && entry.timestamp) {
+                        const ts = new Date(entry.timestamp);
+                        if (!Number.isNaN(ts.getTime())) {
+                            queueCompletionMap.set(toolUseIdMatch[1], ts);
+                        }
+                    }
+                }
                 processEntry(entry, toolMap, agentMap, taskIdToIndex, latestTodos, result);
             }
             catch {
@@ -215,6 +229,21 @@ export async function parseTranscript(transcriptPath) {
     }
     catch {
         // Return partial results on error
+    }
+    // Resolve agent completion: prefer queue-operation timestamps (accurate for
+    // background agents), fall back to tool_result timestamps (inline agents).
+    // Status is deferred so background agents show ◐ until they truly finish.
+    for (const [toolUseId, endTime] of queueCompletionMap) {
+        const agent = agentMap.get(toolUseId);
+        if (agent?.background) {
+            agent.endTime = endTime;
+            agent.status = 'completed';
+        }
+    }
+    for (const agent of agentMap.values()) {
+        if (agent.status === 'running' && agent.endTime) {
+            agent.status = 'completed';
+        }
     }
     result.tools = Array.from(toolMap.values()).slice(-20);
     result.agents = Array.from(agentMap.values()).slice(-10);
@@ -261,6 +290,7 @@ function processEntry(entry, toolMap, agentMap, taskIdToIndex, latestTodos, resu
                     description: input?.description ?? undefined,
                     status: 'running',
                     startTime: timestamp,
+                    background: input?.run_in_background === true,
                 };
                 agentMap.set(block.id, agentEntry);
             }
@@ -344,8 +374,7 @@ function processEntry(entry, toolMap, agentMap, taskIdToIndex, latestTodos, resu
                 tool.endTime = timestamp;
             }
             const agent = agentMap.get(block.tool_use_id);
-            if (agent) {
-                agent.status = 'completed';
+            if (agent && !agent.background) {
                 agent.endTime = timestamp;
             }
         }

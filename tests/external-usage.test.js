@@ -54,6 +54,43 @@ test('getUsageFromExternalSnapshot parses a fresh snapshot', async () => {
   }
 });
 
+test('getUsageFromExternalSnapshot parses optional balance labels', async () => {
+  const updatedAt = Date.UTC(2026, 3, 20, 12, 0, 0);
+  const { filePath, cleanup } = await withTempFile(JSON.stringify({
+    updated_at: new Date(updatedAt).toISOString(),
+    balance_label: ' ¥6.35 ',
+  }));
+
+  try {
+    const usage = getUsageFromExternalSnapshot(makeConfig(filePath), updatedAt + 60_000);
+    assert.deepEqual(usage, {
+      fiveHour: null,
+      sevenDay: null,
+      fiveHourResetAt: null,
+      sevenDayResetAt: null,
+      balanceLabel: '¥6.35',
+    });
+  } finally {
+    await cleanup();
+  }
+});
+
+test('getUsageFromExternalSnapshot sanitizes balance labels before rendering', async () => {
+  const updatedAt = Date.UTC(2026, 3, 20, 12, 0, 0);
+  const { filePath, cleanup } = await withTempFile(JSON.stringify({
+    updated_at: new Date(updatedAt).toISOString(),
+    five_hour: { used_percentage: 42 },
+    balance_label: '\u001b]8;;https://evil.example\u0007click\u001b]8;;\u0007\u202E',
+  }));
+
+  try {
+    const usage = getUsageFromExternalSnapshot(makeConfig(filePath), updatedAt + 60_000);
+    assert.equal(usage?.balanceLabel, 'click');
+  } finally {
+    await cleanup();
+  }
+});
+
 test('getUsageFromExternalSnapshot ignores stale snapshots', async () => {
   const updatedAt = Date.UTC(2026, 3, 20, 12, 0, 0);
   const { filePath, cleanup } = await withTempFile(JSON.stringify({

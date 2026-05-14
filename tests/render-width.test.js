@@ -39,6 +39,7 @@ function baseContext() {
         showSpeed: false,
         showTokenBreakdown: true,
         showUsage: true,
+        usageValue: 'percent',
         usageBarEnabled: false,
         showTools: true,
         showAgents: true,

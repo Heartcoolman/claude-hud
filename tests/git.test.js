@@ -165,6 +165,37 @@ test('getGitStatus counts modified files', async () => {
   }
 });
 
+test('getGitStatus returns UTF-8 filenames when core.quotePath is true', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'claude-hud-git-'));
+  try {
+    execFileSync('git', ['init'], { cwd: dir, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.email', 'test@test.com'], { cwd: dir, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.name', 'Test'], { cwd: dir, stdio: 'ignore' });
+    execFileSync('git', ['config', 'core.quotePath', 'true'], { cwd: dir, stdio: 'ignore' });
+
+    const fileName = '日本語.txt';
+    await writeFile(path.join(dir, fileName), 'original\n');
+    execFileSync('git', ['add', fileName], { cwd: dir, stdio: 'ignore' });
+    execFileSync('git', ['commit', '-m', 'add utf8 file'], { cwd: dir, stdio: 'ignore' });
+
+    await writeFile(path.join(dir, fileName), 'modified\n');
+    const quotedStatus = execFileSync('git', ['status', '--porcelain'], { cwd: dir, encoding: 'utf8' });
+    assert.match(quotedStatus, /\\[0-7]{3}/, `expected git to octal-escape path, got ${quotedStatus}`);
+    assert.equal(quotedStatus.includes(fileName), false);
+
+    const result = await getGitStatus(dir);
+    const tracked = result?.fileStats?.trackedFiles ?? [];
+
+    assert.equal(result?.fileStats?.modified, 1);
+    assert.deepEqual(
+      tracked.map((file) => ({ basename: file.basename, fullPath: file.fullPath, lineDiff: file.lineDiff })),
+      [{ basename: fileName, fullPath: fileName, lineDiff: { added: 1, deleted: 1 } }]
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('getGitStatus counts staged added files', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'claude-hud-git-'));
   try {

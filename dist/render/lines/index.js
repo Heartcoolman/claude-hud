@@ -7,4 +7,5 @@ export { renderUsageLine } from './usage.js';
 export { renderProxyLine } from './proxy.js';
 export { renderMemoryLine } from './memory.js';
 export { renderSessionTokensLine } from './session-tokens.js';
+export { renderSessionTimeLine } from './session-time.js';
 //# sourceMappingURL=index.js.map

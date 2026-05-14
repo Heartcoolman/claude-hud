@@ -97,14 +97,20 @@ This is a [Claude Code platform limitation](https://github.com/anthropics/claude
 
 ## Step 1: Detect Platform, Shell, and Runtime
 
-**IMPORTANT**: Use the environment context values (`Platform:` and `Shell:`), not `uname -s` or ad-hoc checks. The Bash tool may report MINGW/MSYS on Windows, so branch only by the context values.
+**IMPORTANT**: Use the environment context values (`Platform:` and `Shell:`) as your starting point. On `win32`, also check `$OSTYPE` via the Bash tool. Some Windows sessions report `Shell: powershell` while the command path exposed to Claude Code is Git Bash/MSYS2. When `$OSTYPE` is `msys` or `cygwin`, the PowerShell command format can fail before PowerShell runs because bash expands `$env:VAR`, `$p`, and `$(...)` expressions first (see [#531](https://github.com/jarrodwatts/claude-hud/issues/531)).
 
-| Platform | Shell | Command Format |
-|----------|-------|----------------|
-| `darwin` | any | bash (macOS instructions) |
-| `linux` | any | bash (Linux instructions) |
-| `win32` | `bash` (Git Bash, MSYS2) | bash - use Windows + Git Bash instructions. Never use PowerShell commands with bash. |
-| `win32` | `powershell`, `pwsh`, or `cmd` | PowerShell (use Windows + PowerShell instructions) |
+**On `win32`, run this check first:**
+```bash
+echo $OSTYPE
+```
+
+| Platform | Shell | OSTYPE | Command Format |
+|----------|-------|--------|----------------|
+| `darwin` | any | any | bash (macOS instructions) |
+| `linux` | any | any | bash (Linux instructions) |
+| `win32` | `bash` | any | bash — Windows + Git Bash instructions |
+| `win32` | `powershell`, `pwsh`, or `cmd` | `msys` or `cygwin` | bash — Windows + Git Bash instructions (the active command environment is MSYS/Cygwin; PowerShell syntax is unsafe here) |
+| `win32` | `powershell`, `pwsh`, or `cmd` | other / empty | PowerShell — Windows + PowerShell instructions |
 
 ---
 
@@ -192,13 +198,17 @@ Instead, use `sort -V` (GNU version sort, included with Git for Windows) which a
    cols=$(stty size </dev/tty 2>/dev/null | awk '{print $2}'); export COLUMNS=$(( ${cols:-120} > 4 ? ${cols:-120} - 4 : 1 )); plugin_dir=$(ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/claude-hud/*/ 2>/dev/null | sort -V | tail -1); exec "{RUNTIME_PATH}" "${plugin_dir}{SOURCE}"
    ```
 
-**Windows + PowerShell** (Platform: `win32`, Shell: `powershell`, `pwsh`, or `cmd`):
+**Windows + PowerShell** (Platform: `win32`, Shell: `powershell`, `pwsh`, or `cmd`, OSTYPE: other/empty):
+
+> **Before proceeding**: if `echo $OSTYPE` returned `msys` or `cygwin`, use the **Windows + Git Bash** instructions above. In that environment, bash can expand PowerShell variables before PowerShell runs.
 
 1. Get plugin path:
    ```powershell
    $claudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME ".claude" }
-   (Get-ChildItem (Join-Path $claudeDir "plugins\cache\*\claude-hud") -Directory | Where-Object { $_.Name -match '^\d+(\.\d+)+$' } | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1).FullName
+   (Get-ChildItem (Join-Path $claudeDir "plugins\cache\*\claude-hud\*") -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^\d+(\.\d+)+$' } | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1).FullName
    ```
+   The trailing `\*` on the cache glob is required. Without it, `Get-ChildItem` returns the `claude-hud` directory itself, whose name does not match the `^\d+(\.\d+)+$` version pattern, so the lookup resolves to `$null` and any subsequent `Join-Path` throws (see [#521](https://github.com/jarrodwatts/claude-hud/issues/521)).
+
    If empty or errors, the plugin is not installed. Ask the user to install via marketplace first.
 
 2. Get runtime absolute path (require node on Windows):
@@ -216,15 +226,58 @@ Instead, use `sort -V` (GNU version sort, included with Git for Windows) which a
 
 3. Use `dist\index.js`.
 
-4. Generate command (note: quotes around runtime path handle spaces in paths):
+4. Write the PowerShell wrapper script.
 
-   The command exports `COLUMNS` so the HUD knows the real terminal width.
-   `[Console]::WindowWidth` reads the console buffer width. The `- 4`
-   accounts for Claude Code's input area padding (2 columns on each side).
+   Claude Code spawns the statusLine subprocess with no console handle attached. On Windows PowerShell 5.1, that makes `[Console]::WindowWidth` throw `System.IO.IOException: The handle is invalid.`, which halts the script before `node` runs — the HUD shows only "initializing..." and no error reaches any log. The macOS/Linux branch sidesteps this with `${cols:-120}` (`stty size` falls back when the controlling terminal is missing); the PowerShell equivalent is `try/catch` around `[Console]::WindowWidth`.
+
+   Inline `powershell -Command "..."` strings in `settings.json` make `try/catch` and multi-line control flow awkward because of nested quoting and the `cmd /s /c` rules that wrap the call. A standalone `.ps1` wrapper is the PowerShell equivalent of the macOS/Linux `bash -c '...'` script body — proper control flow, no JSON-string quoting pressure, and a single source of truth that future PS-side fixes can extend.
+
+   The wrapper file at `$claudeDir/plugins/claude-hud/statusline.ps1` should contain:
+
+   ```powershell
+   try { $w = [Console]::WindowWidth } catch { $w = 120 }
+   $env:COLUMNS = [Math]::Max(1, $w - 4)
+   $claudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
+   $pluginDir = (Get-ChildItem (Join-Path $claudeDir 'plugins\cache\*\claude-hud\*') -Directory -ErrorAction SilentlyContinue |
+       Where-Object { $_.Name -match '^\d+(\.\d+)+$' } |
+       Sort-Object { [version]$_.Name } -Descending |
+       Select-Object -First 1).FullName
+   if (-not $pluginDir) { exit 0 }
+   & '{RUNTIME_PATH}' (Join-Path $pluginDir 'dist\index.js')
+   ```
+
+   Write it using `[System.IO.File]::WriteAllText` with `New-Object System.Text.UTF8Encoding $false` so the file is UTF-8 without a BOM. A script block with `.ToString()` is the cleanest way to embed the body without here-string quoting pressure:
+
+   ```powershell
+   $wrapperDir = Join-Path $claudeDir "plugins\claude-hud"
+   New-Item -ItemType Directory -Force -Path $wrapperDir | Out-Null
+   $wrapperPath = Join-Path $wrapperDir "statusline.ps1"
+   $runtimePathLiteral = $runtimePath.Replace("'", "''")
+   $wrapperBody = ({
+       try { $w = [Console]::WindowWidth } catch { $w = 120 }
+       $env:COLUMNS = [Math]::Max(1, $w - 4)
+       $claudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
+       $pluginDir = (Get-ChildItem (Join-Path $claudeDir 'plugins\cache\*\claude-hud\*') -Directory -ErrorAction SilentlyContinue |
+           Where-Object { $_.Name -match '^\d+(\.\d+)+$' } |
+           Sort-Object { [version]$_.Name } -Descending |
+           Select-Object -First 1).FullName
+       if (-not $pluginDir) { exit 0 }
+       & '__RUNTIME_PATH__' (Join-Path $pluginDir 'dist\index.js')
+   }.ToString().Trim()).Replace('__RUNTIME_PATH__', $runtimePathLiteral)
+   [System.IO.File]::WriteAllText($wrapperPath, $wrapperBody, (New-Object System.Text.UTF8Encoding $false))
+   ```
+
+   `$runtimePath` is the value detected in step 2 (the absolute path returned by `(Get-Command node).Source`, typically `C:\Program Files\nodejs\node.exe`). `$runtimePathLiteral` escapes single quotes for the generated single-quoted PowerShell command, and `.Replace()` performs literal replacement so `$` and other regex replacement characters in the runtime path are preserved.
+
+   `Set-Content -Encoding UTF8` and `Out-File -Encoding UTF8` on Windows PowerShell 5.1 both emit a UTF-8 BOM — PS 7+ added `-Encoding utf8NoBOM`, but PS 5.1 ships as the Windows 10/11 default and does not. `WriteAllText` + `UTF8Encoding $false` writes without a BOM in both versions.
+
+5. Generate command (points at the wrapper file, not an inline `-Command` string):
 
    ```
-   powershell -Command "& {$env:COLUMNS=[Math]::Max(1,[Console]::WindowWidth-4); $claudeDir=if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }; $p=(Get-ChildItem (Join-Path $claudeDir 'plugins\cache\*\claude-hud') -Directory | Where-Object { $_.Name -match '^\d+(\.\d+)+$' } | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1).FullName; & '{RUNTIME_PATH}' (Join-Path $p '{SOURCE}')}"
+   powershell -NoProfile -ExecutionPolicy Bypass -File "{WRAPPER_PATH}"
    ```
+
+   `{WRAPPER_PATH}` is the value of `$wrapperPath` from step 4 (typically `C:\Users\<user>\.claude\plugins\claude-hud\statusline.ps1`).
 
 **WSL (Windows Subsystem for Linux)**: If running in WSL, use the macOS/Linux instructions. Ensure the plugin is installed in the Linux environment (`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/...`), not the Windows side.
 
@@ -257,6 +310,18 @@ If a write fails with `File has been unexpectedly modified`, re-read the file an
 **JSON safety**: Write `settings.json` with a real JSON serializer or editor API, not manual string concatenation.
 If you must inspect the saved JSON manually, the embedded bash command must preserve escaped backslashes inside the awk fragment.
 For example, the saved JSON should contain `\\$(NF-1)` and `\\$0`, not `\$(NF-1)` and `\$0`.
+
+**Windows PowerShell 5.1 BOM**: on Windows PowerShell 5.1 (the default shell on Windows 10/11), `Set-Content -Encoding UTF8` and `Out-File -Encoding UTF8` emit a UTF-8 BOM (`EF BB BF`). RFC 8259 §8.1 forbids BOM in JSON. PowerShell 7+ added `-Encoding utf8NoBOM`, but PS 5.1 did not. Use `[System.IO.File]::WriteAllText` with `New-Object System.Text.UTF8Encoding $false` to write UTF-8 without a BOM from both PS versions:
+
+```powershell
+[System.IO.File]::WriteAllText($path, $json, (New-Object System.Text.UTF8Encoding $false))
+```
+
+Verify the first bytes are `7B 0D 0A` (`{` + CRLF) or `7B 0A` (`{` + LF), not `EF BB BF`:
+
+```powershell
+[System.IO.File]::ReadAllBytes($path)[0..2]
+```
 
 
 After successfully writing the config, tell the user:
@@ -343,6 +408,20 @@ Use AskUserQuestion:
    **Windows shell mismatch (for example, "bash not recognized")**:
    - Command format does not match `Platform:` + `Shell:`
    - Solution: re-run Step 1 branch logic and use the matching variant
+
+   **Windows: HUD shows only "initializing..." with no error (PowerShell shell, MSYS/Cygwin command environment)**:
+   - Root cause: `Shell: powershell` with `$OSTYPE=msys` or `$OSTYPE=cygwin`, causing bash to process the command before PowerShell
+   - Check: run `echo $OSTYPE` in the Bash tool — if it returns `msys` or `cygwin`, this is the issue
+   - Solution: re-run setup; when OSTYPE is `msys`/`cygwin`, follow the Windows + Git Bash path in Step 1
+
+   **Windows + PowerShell: HUD silent or "initializing..." with no error in any log (OSTYPE is not msys/cygwin)**:
+   - Symptoms: HUD stays at "initializing..." or shows nothing. Running the generated command interactively in a PowerShell prompt produces the expected HUD output, but the version invoked through Claude Code does not.
+   - Root cause: either (a) `[Console]::WindowWidth` threw `System.IO.IOException: The handle is invalid.` because the subprocess Claude Code spawns has no console handle, or (b) the cache glob `plugins\cache\*\claude-hud` (with no trailing `\*`) matched the `claude-hud` directory itself, leaving `$pluginDir` as `$null` and `Join-Path` throwing `Cannot bind argument to parameter 'Path' because it is null`.
+   - Check: pipe stdin through `cmd.exe` to mirror Claude Code's invocation:
+     ```powershell
+     '{}' | & cmd.exe /c '{GENERATED_COMMAND}'
+     ```
+     If you see either error, the existing setup predates the wrapper-based command format. Re-run `/claude-hud:setup` to regenerate `statusline.ps1` with `try/catch` and the corrected version-dir glob. See [#521](https://github.com/jarrodwatts/claude-hud/issues/521).
 
    **Windows: PowerShell execution policy error**:
    - Run: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`

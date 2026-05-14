@@ -64,6 +64,7 @@ export interface AgentEntry {
     status: 'running' | 'completed';
     startTime: Date;
     endTime?: Date;
+    background?: boolean;
 }
 export interface TodoItem {
     content: string;
@@ -74,6 +75,7 @@ export interface UsageData {
     sevenDay: number | null;
     fiveHourResetAt: Date | null;
     sevenDayResetAt: Date | null;
+    balanceLabel?: string | null;
 }
 export interface ExternalUsageSnapshot {
     five_hour?: {
@@ -85,6 +87,7 @@ export interface ExternalUsageSnapshot {
         resets_at?: string | number | null;
     } | null;
     updated_at?: string | number | null;
+    balance_label?: string | null;
 }
 /**
  * Carpool / proxy provider 5-hour usage (e.g. reclaude.ai).

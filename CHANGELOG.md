@@ -4,7 +4,19 @@ All notable changes to Claude HUD will be documented in this file.
 
 ## [Unreleased]
 
+### Synced from upstream (jarrodwatts/claude-hud, post-0.0.12)
+- feat: `balance_label` support for third-party model usage display (#541).
+- feat: session start date + last response timestamp display, new `sessionTime` HudElement (#537).
+- feat: `remaining` mode for usage value (#536).
+- fix: `git status` octal-escaped unicode paths rendered as garbled text (#543).
+- fix: invalidate stale transcript agent cache; use queue-operation timestamps for accurate background agent duration (#515).
+- fix: Windows + PowerShell `/claude-hud:setup` writes a `statusline.ps1` wrapper with guarded width fallback and corrected version-directory glob (#521, #538).
+- fix: detect `OSTYPE=msys` on win32 to use Git Bash command format (#532).
+- Added Windows PowerShell 5.1 guidance for writing `settings.json` without a UTF-8 BOM.
+
 ## [0.2.0] - 2026-05-10
+
+## [0.0.12] - 2026-04-04
 
 ### Added (Heartcoolman fork)
 
