@@ -101,14 +101,13 @@ export async function main(overrides: Partial<MainDeps> = {}): Promise<void> {
       }
     }
 
+    // Proxy (ReClaude) is independently gated by `display.reclaude.enabled`
+    // inside getProxy*; decoupled from `showUsage` so users can turn off
+    // Anthropic-native rate-limit reading without losing the ReClaude bar.
     const proxyUsage: RenderContext["proxyUsage"] =
-      config.display.showUsage !== false
-        ? deps.getProxyUsage(config, deps.now())
-        : null;
+      deps.getProxyUsage(config, deps.now());
     const proxyAuthStatus: RenderContext["proxyAuthStatus"] =
-      config.display.showUsage !== false
-        ? deps.getProxyAuthStatus(config, deps.now())
-        : null;
+      deps.getProxyAuthStatus(config, deps.now());
 
     const extraCmd = deps.parseExtraCmdArg();
     const extraLabel = extraCmd ? await deps.runExtraCmd(extraCmd) : null;

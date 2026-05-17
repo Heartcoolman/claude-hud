@@ -14,13 +14,16 @@ import { formatResetTime } from "../format-reset-time.js";
  *   "proxy: 79% $39.33/$50 (18m)"
  *
  * Returns null when there's no data and no auth warning to show, or when
- * the surrounding usage area is hidden (Bedrock provider, showUsage off).
+ * the provider hides usage (Bedrock).
+ *
+ * NOTE: this renderer is intentionally NOT gated by `display.showUsage`.
+ * `showUsage` controls Anthropic-native rate-limit reading; ReClaude is
+ * a separate quota stream gated by `display.reclaude.enabled` inside the
+ * data-loading layer (`getProxyUsage` / `getProxyAuthStatus`).
  */
 export function renderProxyLine(ctx, alignLabels = false) {
     const display = ctx.config?.display;
     const colors = ctx.config?.colors;
-    if (display?.showUsage === false)
-        return null;
     if (shouldHideUsage(ctx.stdin))
         return null;
     if (!ctx.proxyUsage && !ctx.proxyAuthStatus)

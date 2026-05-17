@@ -20,6 +20,14 @@ All notable changes to Claude HUD will be documented in this file.
   remains addressable in user configs even though it is no longer in the
   default order. No migration required for existing configs — explicit
   `elementOrder` / `mergeGroups` values are preserved verbatim.
+- `display.showUsage` no longer gates the ReClaude data path. Setting
+  `showUsage: false` now stops Anthropic-native rate-limit parsing
+  (`getUsageFromStdin`, `getUsageFromExternalSnapshot`) **without**
+  also stopping the ReClaude cache read and 60s background fetcher.
+  Proxy load is gated solely by `display.reclaude.enabled` inside
+  `getProxyUsage` / `getProxyAuthStatus`. The `renderProxyLine` early
+  return on `showUsage === false` is gone for the same reason.
+  Bedrock-provider hide (`shouldHideUsage`) is preserved.
 
 ## [0.2.1] - 2026-05-14
 

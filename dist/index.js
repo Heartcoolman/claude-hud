@@ -69,12 +69,11 @@ export async function main(overrides = {}) {
                 usageData = deps.getUsageFromExternalSnapshot(config, deps.now());
             }
         }
-        const proxyUsage = config.display.showUsage !== false
-            ? deps.getProxyUsage(config, deps.now())
-            : null;
-        const proxyAuthStatus = config.display.showUsage !== false
-            ? deps.getProxyAuthStatus(config, deps.now())
-            : null;
+        // Proxy (ReClaude) is independently gated by `display.reclaude.enabled`
+        // inside getProxy*; decoupled from `showUsage` so users can turn off
+        // Anthropic-native rate-limit reading without losing the ReClaude bar.
+        const proxyUsage = deps.getProxyUsage(config, deps.now());
+        const proxyAuthStatus = deps.getProxyAuthStatus(config, deps.now());
         const extraCmd = deps.parseExtraCmdArg();
         const extraLabel = extraCmd ? await deps.runExtraCmd(extraCmd) : null;
         const sessionDuration = formatSessionDuration(transcript.sessionStart, deps.now);
