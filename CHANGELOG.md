@@ -4,6 +4,15 @@ All notable changes to Claude HUD will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-05-17
+
+Patch release: this fork is now ReClaude-first by default. The default
+HUD goes from three lines (`[model] | project`, `Context | Usage`,
+`ReClaude $ | ⏱`) to two (`[model] | project | Context`,
+`ReClaude $ | ⏱`). All changes are additive on top of the validation
+layer, so existing user configs with explicit `elementOrder` /
+`mergeGroups` / `showUsage` continue to work unchanged.
+
 ### Changed (Heartcoolman fork)
 - Default `elementOrder` no longer includes `usage`; `proxy` (ReClaude) moves
   in right after `context`. Users who want Anthropic-native rate limits
