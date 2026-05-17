@@ -4,6 +4,24 @@ import * as os from 'node:os';
 import { getHudPluginDir } from './claude-config-dir.js';
 export const DEFAULT_ELEMENT_ORDER = [
     'project',
+    'context',
+    'addedDirs',
+    'proxy',
+    'promptCache',
+    'memory',
+    'environment',
+    'tools',
+    'agents',
+    'todos',
+    'sessionTime',
+];
+export const DEFAULT_MERGE_GROUPS = [
+    ['project', 'context'],
+];
+// All addressable elements, decoupled from DEFAULT_ELEMENT_ORDER so users can
+// opt back into elements (e.g. 'usage') that the default layout omits.
+const KNOWN_ELEMENTS = new Set([
+    'project',
     'addedDirs',
     'context',
     'usage',
@@ -15,11 +33,7 @@ export const DEFAULT_ELEMENT_ORDER = [
     'agents',
     'todos',
     'sessionTime',
-];
-export const DEFAULT_MERGE_GROUPS = [
-    ['context', 'usage'],
-];
-const KNOWN_ELEMENTS = new Set(DEFAULT_ELEMENT_ORDER);
+]);
 function defaultProxyCachePath() {
     if (process.platform === 'win32') {
         const local = process.env.LOCALAPPDATA;

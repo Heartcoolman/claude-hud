@@ -110,20 +110,22 @@ src/
         └── environment.ts    # Config counts (opt-in)
 ```
 
-**HudElement enum order (`src/config.ts`)**: `project | context | usage | proxy
-| promptCache | memory | environment | tools | agents | todos`. Default
-`mergeGroups: [['context', 'usage']]` puts proxy on its own line below.
+**HudElement enum order (`src/config.ts`)**: `project | addedDirs | context |
+usage | proxy | promptCache | memory | environment | tools | agents | todos |
+sessionTime`. Default `elementOrder` omits `usage` (this fork is ReClaude-first
+— add `"usage"` back explicitly to surface Anthropic-native rate limits).
+Default `mergeGroups: [['project', 'context']]` puts the context bar on the
+project line; ReClaude (when enabled) renders on its own line below.
 
 ### Output Format (default expanded layout)
 
 ```
-[Opus] │ my-project git:(main*)
-Context █████░░░░░ 45% │ Usage ██░░░░░░░░ 25% (1h 30m / 5h)
+[Opus] │ my-project git:(main*) │ Context █████░░░░░ 45%
 ReClaude $ █████░░░░░ 47% ($23.69/$50) | ⏱ ██░░░░░░░░ 21% (3h 57m / 5h)
 ```
 
-Lines 1-2 always shown when their data is available. Additional lines are
-opt-in via config:
+Line 1 always shows model + project + context. Additional lines are opt-in via
+config:
 - ReClaude line (`display.reclaude.enabled`): dual progress bars — money
   (`usedUsd / quotaUsd`) and time-elapsed-in-5h-window. macOS auto-refresh.
 - Tools line (`showTools`): ◐ Edit: auth.ts | ✓ Read ×3

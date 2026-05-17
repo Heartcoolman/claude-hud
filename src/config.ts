@@ -54,9 +54,8 @@ export interface HudColorOverrides {
 
 export const DEFAULT_ELEMENT_ORDER: HudElement[] = [
   'project',
-  'addedDirs',
   'context',
-  'usage',
+  'addedDirs',
   'proxy',
   'promptCache',
   'memory',
@@ -68,10 +67,25 @@ export const DEFAULT_ELEMENT_ORDER: HudElement[] = [
 ];
 
 export const DEFAULT_MERGE_GROUPS: HudElement[][] = [
-  ['context', 'usage'],
+  ['project', 'context'],
 ];
 
-const KNOWN_ELEMENTS = new Set<HudElement>(DEFAULT_ELEMENT_ORDER);
+// All addressable elements, decoupled from DEFAULT_ELEMENT_ORDER so users can
+// opt back into elements (e.g. 'usage') that the default layout omits.
+const KNOWN_ELEMENTS = new Set<HudElement>([
+  'project',
+  'addedDirs',
+  'context',
+  'usage',
+  'proxy',
+  'promptCache',
+  'memory',
+  'environment',
+  'tools',
+  'agents',
+  'todos',
+  'sessionTime',
+]);
 
 function defaultProxyCachePath(): string {
   if (process.platform === 'win32') {

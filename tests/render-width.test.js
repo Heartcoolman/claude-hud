@@ -30,6 +30,9 @@ function baseContext() {
       showSeparators: false,
       pathLevels: 1,
       gitStatus: { enabled: true, showDirty: true, showAheadBehind: false, showFileStats: false, branchOverflow: 'truncate' },
+      // Pin elementOrder locally so this fixture exercises the historical
+      // context+usage merge regardless of DEFAULT_ELEMENT_ORDER evolving.
+      elementOrder: ['project', 'context', 'usage', 'proxy', 'promptCache', 'memory', 'environment', 'tools', 'agents', 'todos', 'sessionTime'],
       display: {
         showModel: true,
         showContextBar: true,

@@ -4,6 +4,23 @@ All notable changes to Claude HUD will be documented in this file.
 
 ## [Unreleased]
 
+### Changed (Heartcoolman fork)
+- Default `elementOrder` no longer includes `usage`; `proxy` (ReClaude) moves
+  in right after `context`. Users who want Anthropic-native rate limits
+  back can add `"usage"` to `elementOrder` in their config.
+- `addedDirs` moved to sit after `context` (was between `project` and
+  `context`) so the default `mergeGroups` can fuse project+context — merge
+  requires adjacency in `elementOrder`. Only affects users who set
+  `display.addedDirsLayout = 'line'`; inline (default) rendering is
+  unchanged.
+- Default `mergeGroups` is now `[["project", "context"]]` (was
+  `[["context", "usage"]]`). The context bar attaches to the project line;
+  ReClaude (when enabled) renders on its own left-aligned line below.
+- `KNOWN_ELEMENTS` decoupled from `DEFAULT_ELEMENT_ORDER` so `usage`
+  remains addressable in user configs even though it is no longer in the
+  default order. No migration required for existing configs — explicit
+  `elementOrder` / `mergeGroups` values are preserved verbatim.
+
 ## [0.2.1] - 2026-05-14
 
 Patch release that pulls in 30 upstream commits (`70ecdbf..6f7d073` from
